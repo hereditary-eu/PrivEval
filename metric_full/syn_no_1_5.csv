@@ -1,15 +1,2 @@
 ,Metric,Result
-0,Attribute Inference Risk,0.66
-1,GeneralizedCAP,0.5
-2,ZeroCAP,0.0
-3,Median Distance to Closest Record,0.74
-4,Hitting Rate,0.86
-5,Membership Inference Risk,0.89
-6,Nearest Neighbour Adversarial Accuracy,0.28
-7,Common Row Proportion,0.36
-8,Nearest Synthetic Neighbour Distance,0.85
-9,Close Value Probability,0.0
-10,Distant Value Probability,0.45
-11,Authenticity,0.5
-12,DetectionMLP,0.4
-13,Identifiability Score,0.32
+0,Hitting Rate,0.0

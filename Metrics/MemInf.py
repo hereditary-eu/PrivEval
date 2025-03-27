@@ -3,8 +3,6 @@
 import numpy as np
 import pandas as pd
 
-from sklearn.preprocessing import MinMaxScaler
-from sklearn.preprocessing import OrdinalEncoder
 from syntheval import SynthEval
 from sklearn.model_selection import train_test_split
 from copy import deepcopy

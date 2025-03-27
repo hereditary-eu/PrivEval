@@ -1,18 +1,18 @@
-,Unnamed: 0,Metric,Result
-0,0,Attribute Inference Risk,0.65
-1,1,GeneralizedCAP,0.48
-2,2,ZeroCAP,0.0
-3,3,Median Distance to Closest Record,0.75
-4,4,Hitting Rate,1.0
-5,5,Membership Inference Risk,0.75
-6,6,Nearest Neighbour Adversarial Accuracy,0.22
-7,7,Common Row Proportion,0.4
-8,8,Nearest Synthetic Neighbour Distance,0.9
-9,9,Close Value Probability,0.02
-10,10,Distant Value Probability,0.48
-11,11,Authenticity,0.5
-12,12,DetectionMLP,0.37
-13,13,Identifiability Score,0.29
-0,0,Distance to Closest Record,0.66
-1,1,Nearest Neighbour Distance Ratio,0.33
-2,2,Hidden Rate,0.0
+,Unnamed: 0.1,Unnamed: 0,Metric,Result
+0,0,0,Attribute Inference Risk,0.65
+1,1,1,GeneralizedCAP,0.48
+2,2,2,ZeroCAP,0.0
+3,3,3,Median Distance to Closest Record,0.75
+4,4,4,Hitting Rate,0.0
+5,5,5,Membership Inference Risk,0.75
+6,6,6,Nearest Neighbour Adversarial Accuracy,0.22
+7,7,7,Common Row Proportion,0.4
+8,8,8,Nearest Synthetic Neighbour Distance,0.9
+9,9,9,Close Value Probability,0.02
+10,10,10,Distant Value Probability,0.48
+11,11,11,Authenticity,0.5
+12,12,12,DetectionMLP,0.37
+13,13,13,Identifiability Score,0.29
+14,0,0,Distance to Closest Record,0.66
+15,1,1,Nearest Neighbour Distance Ratio,0.33
+16,2,2,Hidden Rate,0.0
