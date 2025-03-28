@@ -50,8 +50,8 @@ This means that PrivEval is a first step to bridge the gap between privacy exper
 | Nearest Neighbor Distance Ratio     | NNDR measures the risk of re-identification by assessing how easily an attacker, using the synthetic data, can infer the individual from which it was generated. This is measure as the distance ratio between real and synthetic data.                                                                                          |
 
 ## Other information
-```
+
 A python notebook is available to generate the real and synthetic dataset using the file gen_dataset.ipynb.
 
 To ensure correct calculation of privacy risk for your data, sensitive_attributes.txt is a text file with sensitive attributes seperated by newline. For other metrics, we refer to their individual implementations in the Metrics folder to change e.g. thresholds and iterations.
-```
+
