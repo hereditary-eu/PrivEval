@@ -526,6 +526,9 @@ def idS_no_prot():
     return R_Diff < 0
 def dcr_no_prot():
     return st.session_state.dists_real_syn_gower[st.session_state.indiv_index, 0] < (np.mean(st.session_state.dists_real_syn_gower[:, 0])/2)
+def nndr_no_prot():
+    ratio = 1 if st.session_state.dists_real_syn_gower[st.session_state.indiv_index, 0] == 0 else (st.session_state.dists_real_syn_gower[st.session_state.indiv_index, 0] / st.session_state.dists_real_syn_gower[st.session_state.indiv_index, 1])
+    return ratio > 0.9
 def hidr_no_prot():
     return st.session_state.indiv_index == st.session_state.idx_real_syn_gower[st.session_state.indiv_index, 0]
     
@@ -628,7 +631,7 @@ def metric_applicability(metric_results):
     if metric_results.loc[metric_results['Metric']=='Distance to Closest Record', 'Result'].iloc[0] > 0.5:
         shareable_column.loc[shareable_column['Metric']=='Distance to Closest Record', 'Shareable?'] = '⚠️'
         st.session_state.dcr_share = '⚠️'
-    if metric_results.loc[metric_results['Metric']=='Nearest Neighbour Distance Ratio', 'Result'].iloc[0] > 0.1:
+    if metric_results.loc[metric_results['Metric']=='Nearest Neighbour Distance Ratio', 'Result'].iloc[0] > 0.3:
         shareable_column.loc[shareable_column['Metric']=='Nearest Neighbour Distance Ratio', 'Shareable?'] = '⚠️'
         st.session_state.nndr_share = '⚠️'
     if metric_results.loc[metric_results['Metric']=='Hidden Rate', 'Result'].iloc[0] >= 0.00001:
@@ -697,9 +700,9 @@ def metric_applicability(metric_results):
         user_protected_column.loc[user_protected_column['Metric']=='Identifiability Score', 'User Protected?'] = '⛔️'
         st.session_state.ids_prot = '⛔️'
     if dcr_no_prot():
-        user_protected_column.loc[user_protected_column['Metric']=='Distance to Closest Record', 'User Protected?'] = '⛔️'
-        st.session_state.dcr_prot = '⛔️'
-    if metric_results.loc[metric_results['Metric']=='Nearest Neighbour Distance Ratio', 'Result'].iloc[0] <= 1:
+        user_protected_column.loc[user_protected_column['Metric']=='Distance to Closest Record', 'User Protected?'] = '⚠️'
+        st.session_state.dcr_prot = '⚠️'
+    if nndr_no_prot():
         user_protected_column.loc[user_protected_column['Metric']=='Nearest Neighbour Distance Ratio', 'User Protected?'] = '⚠️'
         st.session_state.nndr_prot = '⚠️'
     if hidr_no_prot():
@@ -1628,7 +1631,7 @@ if st.session_state.stage == 15: #MIR
             st.subheader("Your data is safe!✅")
         st.write("MIR estimates the risk of identifying whether an individual contributed their data to the real dataset while having access to the synthetic data and a subset of the real data.")
             
-        st.subheader("How is the score calculated?")
+        st.subheader("Risk estimation of the dataset")
         st.write("The attacker follows four steps to identify individuals:")
         st.write("1. Make a new dataset that contains both the real and synthetic data as well as a labeling of whether or not the are real.")
         st.write("2. Split the dataset up into a train and test set.")
@@ -2103,10 +2106,10 @@ if st.session_state.stage == 21: #Authenticity
         st.write("Auth measures the risk of re-identification by assessing how easily an attacker, using the synthetic data, can infer the individual from which it was generated.")
         st.write("The Auth risk is measured as the probability that a synthetic nearest neighbour is closer than a real nearest neighbour over the real dataset.")
         
-        st.subheader(f"Shareability problems: {st.session_state.cvp_share}")
-        if st.session_state.cvp_share == '✅':
+        st.subheader(f"Shareability problems: {st.session_state.auth_share}")
+        if st.session_state.auth_share == '✅':
             st.write("No individuals in the real dataset are closer to synthetic individuals than real individuals")
-        if st.session_state.cvp_share == '⚠️':
+        if st.session_state.auth_share == '⚠️':
             st.write("There are real individuals that are closer to the synthetic individuals than real individuals, and are therefore at high risk.")
         st.subheader(f"Applicability problems: {status_overall}")
         st.markdown(prob_overall, unsafe_allow_html=True)
@@ -2191,7 +2194,6 @@ if st.session_state.stage == 23: #Identifiability
     prob_overall = ''
     sol_overall = ''
     status_overall = '✅'
-    status_u = '✅'
     prob_u_txt = ''
     if st.session_state.is_large:
         prob_overall += '<br>- Distance can be misleading in high-dimensional spaces.'
@@ -2201,25 +2203,22 @@ if st.session_state.stage == 23: #Identifiability
         sol_overall += '<br>- Investigate each real datapoint and its 3 nearest neighbours in real and synthetic.'
         status_overall = '⛔️'
         status_u = '⚠️'
-    if status_overall == '⚠️' and status_u == '✅':
-        prob_u_txt = 'For you, the overall issues still persist. However, your score is calculated correctly.'
-    if status_overall == '✅' and status_u == '✅':
-        prob_u_txt = 'For you, the overall issues still persist. However, your score is calculated correctly.'
-    if status_overall == '⚠️' and status_u == '⚠️':
-        prob_u_txt = 'For you, the overall issues still persist, and your score calculation is influenced by this.'
-    if status_overall == '⛔️' and status_u == '⛔️':
-        prob_u_txt = 'For you, the overall issues still persist, and your score calculation is influenced by this.'
         
     st.title(tit)
-    st.subheader(f"App: {status_overall} User App: {status_u}")
+    st.subheader(f"User Protected?: {st.session_state.ids_prot}, Shareability: {st.session_state.ids_share}, Applicability: {status_overall}")
     col1, col2 = st.columns(2, border=True)
     with col1:
-        st.subheader("Overall")
+        if st.session_state.ids_prot == '⛔️':
+            st.subheader("Your data is at risk!⛔️")
+        if st.session_state.ids_prot == '⚠️':
+            st.subheader("Your data might be at risk!⚠️")
+        if st.session_state.ids_prot == '✅':
+            st.subheader("Your data is safe!✅")
         st.write('''IdScore estimates the risk of re-identifying any real individual while only having access to the synthetic data. 
                 It estimates this as the probability that the distance to the closest synthetic individual is closer than the distance from the closest real individual in weighted versions of the real and synthetic dataset.
                 Here, the weight is assigned as a contribution factor for each individual attribute value.
                 ''')
-        st.write("The IdScore is the calculated as the fraction of weighted individuals where their distance to a synthetic individual is smaller than the distance to a real individual.")
+        
         X_gt_ = st.session_state.real_labels.to_numpy().reshape(len(st.session_state.real_data), -1)
         X_syn_ = st.session_state.syn_labels.to_numpy().reshape(len(st.session_state.syn_data_bin), -1)
         
@@ -2250,7 +2249,8 @@ if st.session_state.stage == 23: #Identifiability
         # See which one is bigger
         R_Diff = distance_hat[st.session_state.indiv_index, 0] - distance_r[st.session_state.indiv_index, 1]
         identifiability_value_indiv = np.sum(R_Diff < 0) / float(no)
-        st.subheader("For your data")
+        
+        st.subheader("How is your score calculated?")
         col1_1, col1_2 = st.columns(2)
         with col1_1:
             st.write("Your real neighbour:")
@@ -2267,10 +2267,22 @@ if st.session_state.stage == 23: #Identifiability
         else: contribution_id = 0
         st.write("For your record, the IdScore contribution would therefore be:")
         st.latex(r"\frac{1["f"{round(distance_hat[st.session_state.indiv_index, 0], 2)} - {round(distance_r[st.session_state.indiv_index, 1], 2)}"r"< 0]}{"f"{len(st.session_state.real_data)}"r"} = "f"{contribution_id}")
-        st.subheader("Problems Overall:")
+        if idS_no_prot():
+            st.write("⛔️You have a synthetic nearest neighbour closer than your real nearest neighbour. Therefore, you are at high risk!⛔️")
+        else:
+            st.write("✅You have no synthetic nearest neighbour closer than your real nearest neighbour. Therefore, you are not at risk.✅")
+        
+        st.subheader("Risk estimation of the dataset")
+        st.write("The IdScore is the calculated as the fraction of weighted individuals where their distance to a synthetic individual is smaller than the distance to a real individual.")
+        
+        
+        st.subheader(f"Shareability problems: {st.session_state.ids_share}")
+        if st.session_state.ids_share == '✅':
+            st.write("No individuals in the real dataset are closer to synthetic individuals than real individuals")
+        if st.session_state.ids_share == '⚠️':
+            st.write("There are real individuals that are closer to the synthetic individuals than real individuals, and are therefore at high risk.")
+        st.subheader(f"Applicability problems: {status_overall}")
         st.markdown(prob_overall, unsafe_allow_html=True)
-        st.subheader("Problems for you:")
-        st.markdown(prob_u_txt, unsafe_allow_html=True)
         st.subheader("Solutions:")
         st.markdown(sol_overall, unsafe_allow_html=True)
         st.write("**The problems that may occur:**")
@@ -2299,7 +2311,6 @@ if st.session_state.stage == 24: #DCR
     prob_overall = ''
     sol_overall = ''
     status_overall = '✅'
-    status_u = '✅'
     prob_u_txt = ''
     if st.session_state.has_continuous:
         prob_overall += f'<br>- Distances lose expresivity and vary much for continuous attributes ({st.session_state.cont_cols}).'
@@ -2312,29 +2323,21 @@ if st.session_state.stage == 24: #DCR
         prob_overall += '<br>- Non-private data is still be produced.'
         sol_overall += '<br>- Investigate each real datapoint and its 3 nearest neighbours in real and synthetic.'
         status_overall = '⛔️'
-        status_u = '⛔️'
-    if status_overall == '⚠️' and status_u == '✅':
-        prob_u_txt = 'For you, the overall issues still persist. However, your score is calculated correctly.'
-    if status_overall == '✅' and status_u == '✅':
-        prob_u_txt = 'For you, the overall issues still persist. However, your score is calculated correctly.'
-    if status_overall == '⚠️' and status_u == '⚠️':
-        prob_u_txt = 'For you, the overall issues still persist, and your score calculation is influenced by this.'
-    if status_overall == '⛔️' and status_u == '⛔️':
-        prob_u_txt = 'For you, the overall issues still persist, and your score calculation is influenced by this.'
-        
+    
     st.title(tit)
-    st.subheader(f"App: {status_overall} User App: {status_u}")
+    st.subheader(f"User Protected?: {st.session_state.dcr_prot}, Shareability: {st.session_state.dcr_share}, Applicability: {status_overall}")
     col1, col2 = st.columns(2, border=True)
     with col1:
-        st.subheader("Overall")
+        if st.session_state.dcr_prot == '⛔️':
+            st.subheader("Your data is at risk!⛔️")
+        if st.session_state.dcr_prot == '⚠️':
+            st.subheader("Your data might be at risk!⚠️")
+        if st.session_state.dcr_prot == '✅':
+            st.subheader("Your data is safe!✅")
         st.write("DCR measures the risk of re-identification by assessing how easily an attacker, using the synthetic data, can infer the individual from which it was generated.")
-        st.write("DCR is the calculated in three steps:")
-        st.write("1. Use PCA, MCA and/or FAMD to map the datasets to 2 dimensions.")
-        st.write("2. Use the mapped dataset to determine the nearest neighbour distances from real to synthetic individuals.")
-        st.write("3. Calculate the mean of the distances.")
-        st.write("*To make the score fit the risk measure, we take the logarithm of the mean, and apply the sigmoid function. This is then subtracted from 1.")
+        
         st.subheader("For your data")
-        st.write("You:")
+        st.write("You are:")
         st.dataframe(st.session_state.real_data.iloc[[st.session_state.indiv_index]], use_container_width=True, hide_index=True)
         st.write("Your syn neighbour:")
         st.dataframe(st.session_state.syn_data_bin.iloc[[st.session_state.idx_real_syn_gower[st.session_state.indiv_index, 0]]], use_container_width=True, hide_index=True)
@@ -2345,10 +2348,26 @@ if st.session_state.stage == 24: #DCR
             return 1/(1 + np.exp(-x)) 
         res = 1 - sigmoid(log(st.session_state.dists_real_syn_gower[st.session_state.indiv_index, 0], 10))
         st.latex(rf"1 - \sigma(log({round(st.session_state.dists_real_syn_gower[st.session_state.indiv_index, 0], 4)})) = {round(res, 2)}")
-        st.subheader("Problems Overall:")
+        if dcr_no_prot():
+            st.write("⚠️ Your distance to your synthetic neighbor is smaller than the average. Therefore, you are in the higher risk group!⚠️")
+        else:
+            st.write("✅ Your distance to your synthetic neighbor is larger than the average. Therefore, you are in the lower risk group.✅")
+        
+        
+        st.subheader("Risk estimation of the dataset")
+        st.write("DCR is the calculated in three steps:")
+        st.write("1. Use PCA, MCA and/or FAMD to map the datasets to 2 dimensions.")
+        st.write("2. Use the mapped dataset to determine the nearest neighbour distances from real to synthetic individuals.")
+        st.write("3. Calculate the mean of the distances.")
+        st.write("*To make the score fit the risk measure, we take the logarithm of the mean, and apply the sigmoid function. This is then subtracted from 1.")
+        
+        st.subheader(f"Shareability problems: {st.session_state.dcr_share}")
+        if st.session_state.dcr_share == '✅':
+            st.write("There is generally a long distance from real individuals to synthetic individuals.")
+        if st.session_state.dcr_share == '⚠️':
+            st.write("There is generally a short distance from real individuals to synthetic individuals.")
+        st.subheader(f"Applicability problems: {status_overall}")
         st.markdown(prob_overall, unsafe_allow_html=True)
-        st.subheader("Problems for you:")
-        st.markdown(prob_u_txt, unsafe_allow_html=True)
         st.subheader("Solutions:")
         st.markdown(sol_overall, unsafe_allow_html=True)
         st.write("**The problems that may occur:**")
@@ -2371,7 +2390,6 @@ if st.session_state.stage == 25: #NNDR
     prob_overall = ''
     sol_overall = ''
     status_overall = '✅'
-    status_u = '✅'
     prob_u_txt = ''
     if st.session_state.has_continuous:
         prob_overall += f'<br>- Distances lose expresivity and vary much for continuous attributes ({st.session_state.cont_cols}).'
@@ -2385,28 +2403,21 @@ if st.session_state.stage == 25: #NNDR
         sol_overall += '<br>- Investigate each real datapoint and its 3 nearest neighbours in real and synthetic.'
         status_overall = '⛔️'
         status_u = '⚠️'
-    if status_overall == '⚠️' and status_u == '✅':
-        prob_u_txt = 'For you, the overall issues still persist. However, your score is calculated correctly.'
-    if status_overall == '✅' and status_u == '✅':
-        prob_u_txt = 'For you, the overall issues still persist. However, your score is calculated correctly.'
-    if status_overall == '⚠️' and status_u == '⚠️':
-        prob_u_txt = 'For you, the overall issues still persist, and your score calculation is influenced by this.'
-    if status_overall == '⛔️' and status_u == '⛔️':
-        prob_u_txt = 'For you, the overall issues still persist, and your score calculation is influenced by this.'
         
     st.title(tit)
-    st.subheader(f"App: {status_overall} User App: {status_u}")
+    st.subheader(f"User Protected?: {st.session_state.nndr_prot}, Shareability: {st.session_state.nndr_share}, Applicability: {status_overall}")
     col1, col2 = st.columns(2, border=True)
     with col1:
-        st.subheader("Overall")
+        if st.session_state.nndr_prot == '⛔️':
+            st.subheader("Your data is at risk!⛔️")
+        if st.session_state.nndr_prot == '⚠️':
+            st.subheader("Your data might be at risk!⚠️")
+        if st.session_state.nndr_prot == '✅':
+            st.subheader("Your data is safe!✅")
         st.write("NNDR measures the risk of re-identification by assessing how easily an attacker, using the synthetic data, can infer the individual from which it was generated.")
-        st.write("NNDR is the calculated in three steps:")
-        st.write("1. Use PCA, MCA and/or FAMD to map the datasets to 2 dimensions.")
-        st.write("2. Use the mapped dataset to determine the nearest and 2nd nearest neighbour distances from real to synthetic individuals.")
-        st.write("3. Calculate the ratio between the distances of the nearest and 2nd nearest synthetic neighbour.")
-        st.write("*To make the score fit the risk measure, the score is subtracted from 1.*")
+        
         st.subheader("For your data")
-        st.write("You:")
+        st.write("You are:")
         st.dataframe(st.session_state.real_data.iloc[[st.session_state.indiv_index]], use_container_width=True, hide_index=True)
         st.write("Your syn neighbour:")
         st.dataframe(st.session_state.syn_data_bin.iloc[[st.session_state.idx_real_syn_gower[st.session_state.indiv_index, 0]]], use_container_width=True, hide_index=True)
@@ -2417,12 +2428,26 @@ if st.session_state.stage == 25: #NNDR
         
         st.write("Thereby, your contribution to the score is:")
         ratio = 1 if st.session_state.dists_real_syn_gower[st.session_state.indiv_index, 0] == 0 else (st.session_state.dists_real_syn_gower[st.session_state.indiv_index, 0] / st.session_state.dists_real_syn_gower[st.session_state.indiv_index, 1])
-        
         st.latex(r"1 - \frac{"f"{round(st.session_state.dists_real_syn_gower[st.session_state.indiv_index, 0], 4)}"r"}{"f"{round(st.session_state.dists_real_syn_gower[st.session_state.indiv_index, 1], 4)}"r"} = "f"{round(ratio, 4)}")
-        st.subheader("Problems Overall:")
+        if nndr_no_prot():
+            st.write("⚠️You have a synthetic neighbours that have similar distances. Therefore, you are at risk!⚠️")
+        else:
+            st.write("✅Your synthetic neighbours do not have similar distances. Therefore, you are not at risk!✅")
+        
+        st.subheader("Risk estimation of the dataset")
+        st.write("NNDR is the calculated in three steps:")
+        st.write("1. Use PCA, MCA and/or FAMD to map the datasets to 2 dimensions.")
+        st.write("2. Use the mapped dataset to determine the nearest and 2nd nearest neighbour distances from real to synthetic individuals.")
+        st.write("3. Calculate the ratio between the distances of the nearest and 2nd nearest synthetic neighbour.")
+        st.write("*To make the score fit the risk measure, the score is subtracted from 1.*")
+        
+        st.subheader(f"Shareability problems: {st.session_state.nndr_share}")
+        if st.session_state.nndr_share == '✅':
+            st.write("In general, real individuals do not have similar distances to the synthetic individuals.")
+        if st.session_state.nndr_share == '⚠️':
+            st.write("In general, real individuals have similar distances to the synthetic individuals.")
+        st.subheader(f"Applicability problems: {status_overall}")
         st.markdown(prob_overall, unsafe_allow_html=True)
-        st.subheader("Problems for you:")
-        st.markdown(prob_u_txt, unsafe_allow_html=True)
         st.subheader("Solutions:")
         st.markdown(sol_overall, unsafe_allow_html=True)
         st.write("**The problems that may occur:**")
