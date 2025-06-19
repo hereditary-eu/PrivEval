@@ -57,7 +57,7 @@ def get_data(epsilon):
     all_labels = pd.DataFrame({'First Name':r_fn, 'Last Name': r_ln, 'Height': all_data['Height'],'Nationality': r_na, 'Favorite Icecream':r_fl, 'Like Liquorice': all_data['Like Liquorice'], 'Times Been to Italy': all_data['Times Been to Italy'], 'First Time London': all_data['First Time London'], 'Steps per Day': all_data['Steps per Day']})
     st.session_state.real_labels = all_labels[:len(st.session_state.real_data)]
     st.session_state.syn_labels = all_labels[-len(st.session_state.real_data):]
-    tsne = TSNE(n_components=2)
+    tsne = TSNE(perplexity=140, n_components=2)
     st.session_state.real_coords_tsne = tsne.fit_transform(st.session_state.real_labels)
     st.session_state.syn_coords_tsne = tsne.fit_transform(st.session_state.syn_labels)
     st.session_state.tsne_df_real = pd.DataFrame(st.session_state.real_coords_tsne)
