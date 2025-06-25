@@ -1190,6 +1190,7 @@ if st.session_state.stage == 10: #AIR
         if st.session_state.air_prot == '✅':
             st.subheader("Your data is safe!✅")
         st.write("AIR measures the risk of inference attacks by assessing how easily an attacker, using public real data and synthetic data, can infer sensitive values. It quantifies this difficulty with the a weighted F1-score.")
+        st.write("The scenario for the attacker is, that the attacker has acces to the synthetic data, and knows something about a specific individual. The attacker the wants to infer information that he does not know about the individual from the synthetic data publication.")
         st.subheader("How is your score calculated?")
         st.write("Your sensitive field is whether or not you like liquorice. Lets try to infer it using your key fields.")
         st.write("The key fields are:")
@@ -1306,6 +1307,7 @@ if st.session_state.stage == 11: #GCAP
         if st.session_state.gcap_prot == '✅':
             st.subheader("Your data is safe!✅")
         st.write("GCAP measures the risk of inference attacks by assessing how easily an attacker, using public real data and synthetic data, can infer sensitive values. It quantifies this difficulty with the Correct Attribution Probability (CAP) algorithm.")
+        st.write("The scenario for the attacker is, that the attacker has acces to the synthetic data, and knows something about a specific individual. The attacker the wants to infer information that he does not know about the individual from the synthetic data publication.")
         st.subheader("How is your score calculated?")
         st.write("Your sensitive field is whether or not you like liquorice. Lets try to infer it using your key fields.")
         st.write("Your key fields are:")
@@ -1382,6 +1384,7 @@ if st.session_state.stage == 12: #ZCAP
         if st.session_state.zcap_prot == '✅':
             st.subheader("Your data is safe!✅")
         st.write("ZCAP measures the risk of inference attacks by assessing how easily an attacker, using public real data and synthetic data, can infer sensitive values. It quantifies this difficulty with the Correct Attribution Probability (CAP) algorithm.")
+        st.write("The scenario for the attacker is, that the attacker has acces to the synthetic data, and knows something about a specific individual. The attacker the wants to infer information that he does not know about the individual from the synthetic data publication.")
         
         st.subheader("How is your score calculated?")
         st.write("Your sensitive field is whether or not you like liquorice. Lets try to infer it using your key fields.")
