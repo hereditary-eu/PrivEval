@@ -24,11 +24,12 @@ def calculate_metric(args, _real_data, _synthetic):
     
     categorical_val_synth, continous_val_synth = get_categorical_continuous(synthetic)
     synthetic[categorical_val_synth] = synthetic[categorical_val_synth].astype("category")
-
+    print("DCR: fit_transform real data")
     #Fit model and get coordinates
     real_coord, model = fit_transform(real_data, nf=2)
+    print("DCR: transform synthetic data")
     synth_coord = transform(synthetic, model)
-
+    print("DCR: calculating metric")
     results = statistics.mean(get_dcr(real_coord, synth_coord))
     
     if results == 0:
@@ -79,8 +80,9 @@ def get_distances_closest_records(
 
     """
     nn = FaissKNeighbors(k=searching_frame)
-    nn.fit(np.array(records))
-
+    print("DCR: fitting nearest neighbors model")
+    nn.fit(np.array(records).astype(np.float32))
+    print("DCR: predicting nearest neighbors")
     # index.search returns two arrays (distances, indices)
     # https://github.com/facebookresearch/faiss/wiki/Getting-started
     distances, indices = nn.predict(synthetic.to_numpy().astype(np.float32))
@@ -92,7 +94,7 @@ def get_distances_closest_records(
 class FaissKNeighbors:
     index: Union[faiss.IndexFlatL2, faiss.IndexIVFFlat]
 
-    def __init__(self, k: int = 5) -> None:
+    def __init__(self, k: int = 1) -> None:
         self.index = faiss.IndexFlatL2()
         self.k = k
 
@@ -122,6 +124,6 @@ class FaissKNeighbors:
         self, X: NDArray[np.float_]
     ) -> Tuple[NDArray[np.float_], NDArray[np.int_]]:
         assert self.index is not None  # nosec: B101
-        distances, indices = self.index.search(X.astype(np.float32), k=self.k)
+        distances, indices = self.index.search(np.array(X).astype(np.float32), k=self.k)
         distances = np.sqrt(distances)
         return distances, indices

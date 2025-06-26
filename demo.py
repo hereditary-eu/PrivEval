@@ -29,16 +29,14 @@ from scipy.spatial.distance import cdist
 # Show the page title and description.
 st.set_page_config(page_title="Privacy Advisor", page_icon="😈", layout='wide')
 
-#st.session_state.stage = 0
+#del st.session_state.stage
 def set_state(i):
     st.session_state.stage = i
-    
+
 def get_data(epsilon):
     st.session_state.real_data = pd.read_csv(f'sample_data_1.csv', index_col=False)
     st.session_state.syn_data_bin = pd.read_csv(f'demo_syn/syn_no_1_{epsilon}.csv', index_col=False).drop(columns=['Unnamed: 0']) #They got switched around during synthesis
-    st.session_state.syn_data_no_bin = pd.read_csv(f'demo_syn/syn_bin_1_{epsilon}.csv', index_col=False).drop(columns=['Unnamed: 0'])#They got switched around during synthesis
     st.session_state.metric_results_bin = pd.read_csv(f'metric_results/syn_no_1_{epsilon}.csv', index_col=False).drop(columns=['Unnamed: 0', 'Unnamed: 0.1', 'Unnamed: 0.2'])#They got switched around during synthesis
-    st.session_state.metric_results_no_bin = pd.read_csv(f'metric_results/syn_bin_1_{epsilon}.csv', index_col=False).drop(columns=['Unnamed: 0', 'Unnamed: 0.1'])#They got switched around during synthesis
     st.session_state.epsilon = epsilon
     #recalculate CRP
     intersection = (st.session_state.real_data.merge(st.session_state.syn_data_bin, how="inner", indicator=False).drop_duplicates())
@@ -60,6 +58,46 @@ def get_data(epsilon):
     tsne = TSNE(perplexity=140, n_components=2)
     st.session_state.real_coords_tsne = tsne.fit_transform(st.session_state.real_labels)
     st.session_state.syn_coords_tsne = tsne.fit_transform(st.session_state.syn_labels)
+    st.session_state.tsne_df_real = pd.DataFrame(st.session_state.real_coords_tsne)
+    st.session_state.tsne_df_syn = pd.DataFrame(st.session_state.syn_coords_tsne)
+
+def get_uploaded_data():
+    st.session_state.coord_real, model_pca = fit_transform(st.session_state.real_data, nf=2)
+    st.session_state.syn_coords = transform(st.session_state.syn_data_bin, model_pca)
+    
+    # Combine real and synthetic data
+    all_data = pd.concat([st.session_state.real_data, st.session_state.syn_data_bin])
+
+    # Identify categorical columns
+    cat_cols = all_data.select_dtypes(include='object').columns
+
+    # Initialize a dictionary to hold encoded data
+    encoded_data = {}
+
+    # Encode categorical columns
+    for col in cat_cols:
+        le = LabelEncoder()
+        encoded_data[col] = le.fit_transform(all_data[col].astype(str))
+
+    # Keep numeric columns as-is
+    num_cols = all_data.select_dtypes(exclude='object').columns
+    for col in num_cols:
+        encoded_data[col] = all_data[col]
+
+    # Create final DataFrame
+    all_labels = pd.DataFrame(encoded_data)
+
+    # Split real and synthetic portions
+    real_len = len(st.session_state.real_data)
+    st.session_state.real_labels = all_labels[:real_len]
+    st.session_state.syn_labels = all_labels[real_len:]
+
+    # Run t-SNE
+    tsne = TSNE(n_components=2)
+    st.session_state.real_coords_tsne = tsne.fit_transform(st.session_state.real_labels)
+    st.session_state.syn_coords_tsne = tsne.fit_transform(st.session_state.syn_labels)
+
+    # Store TSNE results
     st.session_state.tsne_df_real = pd.DataFrame(st.session_state.real_coords_tsne)
     st.session_state.tsne_df_syn = pd.DataFrame(st.session_state.syn_coords_tsne)
 
@@ -536,11 +574,9 @@ def metric_applicability(metric_results):
     
     st.session_state.has_continuous = not st.session_state.real_data.select_dtypes(include=['float64']).empty
     st.session_state.cont_cols = st.session_state.real_data.select_dtypes(include=['float64']).columns.tolist() + ['Steps per Day']
-    
-    with open("sensitive_attributes.txt", "r") as sensitive_file:
-        sensitive_attributes = sensitive_file.read().splitlines()
-    st.session_state.is_sens_cont = any(st.session_state.real_data[attr].dtype == 'float64' for attr in sensitive_attributes if attr in st.session_state.real_data.columns)
-                      
+
+    st.session_state.is_sens_cont = any(st.session_state.real_data[attr].dtype == 'float64' for attr in st.session_state.sensitive_attributes if attr in st.session_state.real_data.columns)
+
     st.session_state.is_large = st.session_state.real_data.shape[1] > 3
     
     zcap_prob=gcap_prob=mdcr_prob=hitr_prob=mir_prob=nnaa_prob=crp_prob=nsnd_prob=cvp_prob=dvp_prob=auth_prob=dmlp_prob=idS_prob=air_prob=dcr_prob=nndr_prob=hidd_prob = ""
@@ -884,194 +920,379 @@ def metric_applicability(metric_results):
 
     return solution_df
 
-if st.session_state.stage == 0:#User input
+if 'stage' not in st.session_state:
+    st.session_state.stage = 0
+    if st.session_state.stage == 0:
+        st.title("PrivEval")
+        st.subheader("Welcome to the Privacy Evaluator!")
+        st.write("This tool helps you evaluate the privacy risks of synthetic datasets compared to real datasets.")
+        st.write("You can either upload your own datasets or use the demo datasets provided:")
+        col1, col2 = st.columns(2, vertical_alignment="center")
+        col1.button(label="Upload your own datasets", on_click=lambda: (
+            st.session_state.__setitem__('uploaded', True),
+            st.session_state.__setitem__('stage', 1)
+        ), use_container_width=True, icon="📁", type="primary")
+        col2.button(label="Use the demo datasets", on_click=lambda: (
+            st.session_state.__setitem__('uploaded', False),
+            st.session_state.__setitem__('stage', 1)
+        ), use_container_width=True, type="secondary")
+
+if st.session_state.stage == 1:#User input
     st.title("PrivEval")
     with st.popover("Show storyline"):
         st.subheader("Hi 👋 This is the story elaborating your goal as a researcher trying to generate private synthetic data.")
         st.write("Imagine that you are a doctor that wants to synthesize a dataset that holds your own sensitive data.")
         st.write("Having synthesized your dataset, you want to estimate the risk of publishing said dataset using privacy metrics, but do the metric give the necessary privacy estimation of your data?")
         st.write("This app thereby demonstrates privacy estimation of differentially private synthetic data that includes your own data, and the risks that may be associated with relying on current available metrics to estimate both your and all others individuals' privacy.")
+    
+    if st.session_state.uploaded:
+        st.session_state.cont_cols = []
+        st.subheader("Upload your dataset")
+        st.write("Please upload CSV files containing your real and synthetic data.")
+        real_data_file = st.file_uploader("Choose your real data", type="csv", accept_multiple_files=False,  )
+        if real_data_file is not None:
+            st.session_state.real_data = pd.read_csv(real_data_file, index_col=False)
+            for col in st.session_state.real_data.columns:
+                if st.session_state.real_data[col].dtype in ['float64', 'int64']:
+                    st.session_state.has_continuous = True
+                    st.session_state.cont_cols.append(col)
+                    st.session_state.is_large = len(st.session_state.real_data) > 1000
+                    st.session_state.indiv_index = random.randint(0, len(st.session_state.real_data) - 1)
+            st.write("*Real data uploaded successfully!*")
+                    
+
+        synthetic_data_file = st.file_uploader("Choose your synthetic data", type="csv")
+        if synthetic_data_file is not None:
+            st.session_state.syn_data_bin = pd.read_csv(synthetic_data_file, index_col=False)
+            if len(st.session_state.syn_data_bin) != len(st.session_state.real_data):
+                st.error("The synthetic data must have the same number of rows as the real data.")
+            if st.session_state.real_data.columns.tolist() != st.session_state.syn_data_bin.columns.tolist():
+                st.error("The synthetic data must have the same columns as the real data.")
+            st.write("*Synthetic data uploaded successfully!*")
+            st.write("**Which attribute is sensitive?**")
+            st.session_state.sensitive_attributes = st.selectbox("Select sensitive attribute", st.session_state.real_data.columns)
         
-    st.write("First, lets generate a profile for you:")
-    col1, col2, col3, col4 = st.columns(4)
-    with col1:
-        choice_liq = st.selectbox("Do you like liquorice?", ["Yes", "No"])
-        like_liquorice = 1 if choice_liq == "Yes" else 0  # Convert selection to 1 or 0
-        fav_ice = st.text_input("What is your favorite Icecream?")
-        choice = st.selectbox("Is this your first time in London?", ["Yes", "No"])
-        first_time = 1 if choice == "Yes" else 0  # Convert selection to 1 or 0
-    st.markdown("""
-    <style>
-    div[data-baseweb="slider"] {
-        max-width: 600px; /* Set your desired max width */
-    }
-    </style>
-    """, unsafe_allow_html=True)
-    height = float(st.slider("How tall are you (in cm)?", 0, 240, 170))
-    query_point = pd.DataFrame({
-            "Favorite Icecream": [fav_ice],
-            "Like Liquorice": [like_liquorice],
-            "First Time London": [first_time],
-            "Height": [height]
-            })
-    st.session_state.real_data = pd.read_csv(f'sample_data_1.csv', index_col=False)
-    input_cols = ["Favorite Icecream","Like Liquorice", "First Time London", "Height"]
-    all_user = pd.concat([st.session_state.real_data[input_cols], query_point], ignore_index=True)
-    fl_encoder = LabelEncoder()
-    r_fl = fl_encoder.fit_transform(all_user['Favorite Icecream'])
-    all_labels_user = pd.DataFrame({'Height': all_user['Height'],'Favorite Icecream':r_fl, 'Like Liquorice': all_user['Like Liquorice'], 'First Time London': all_user['First Time London']})
-    real_labels_user = all_labels_user[:len(st.session_state.real_data)]
-    user_labels = all_labels_user.tail(1)
-    nn_user = NearestNeighbors(n_neighbors=1, metric="euclidean")
-    nn_user.fit(real_labels_user)
-    distance_user, index_user = nn_user.kneighbors(user_labels)
-    st.session_state.indiv_index = index_user[0][0]
-    st.session_state.selected_epsilons = []
-    st.session_state.scatter_data = {}
-    
-    st.button(label="Generate Synthetic Dataset", on_click=set_state, args=[1])
 
-if st.session_state.stage == 1:#Summary statistics
-    st.title("Synthetic Data Generation")
-    st.subheader("Assume this is you:")
-    st.dataframe(st.session_state.real_data.iloc[[st.session_state.indiv_index]], use_container_width=True, hide_index=True)
-    st.write("*Based on your input, this person in the dataset is most like you.*")
-    st.write("This data is in the real dataset, and using the epsilon you desired, a synthetic dataset has been generated.")
-    
-    if "selected_epsilons" not in st.session_state:
+
+    if not st.session_state.uploaded:
+        st.write("First, lets generate a profile for you:")
+        col1, col2, col3, col4 = st.columns(4)
+        with col1:
+            choice_liq = st.selectbox("Do you like liquorice?", ["Yes", "No"])
+            like_liquorice = 1 if choice_liq == "Yes" else 0  # Convert selection to 1 or 0
+            fav_ice = st.text_input("What is your favorite Icecream?")
+            choice = st.selectbox("Is this your first time in London?", ["Yes", "No"])
+            first_time = 1 if choice == "Yes" else 0  # Convert selection to 1 or 0
+        st.markdown("""
+        <style>
+        div[data-baseweb="slider"] {
+            max-width: 600px; /* Set your desired max width */
+        }
+        </style>
+        """, unsafe_allow_html=True)
+        height = float(st.slider("How tall are you (in cm)?", 0, 240, 170))
+        query_point = pd.DataFrame({
+                "Favorite Icecream": [fav_ice],
+                "Like Liquorice": [like_liquorice],
+                "First Time London": [first_time],
+                "Height": [height]
+                })
+
+        st.session_state.real_data = pd.read_csv(f'sample_data_1.csv', index_col=False)
+        st.write("Which attribute is sensitive?")
+        st.session_state.sensitive_attributes = st.selectbox("Select sensitive attribute", st.session_state.real_data.columns)
+        input_cols = ["Favorite Icecream","Like Liquorice", "First Time London", "Height"]
+        all_user = pd.concat([st.session_state.real_data[input_cols], query_point], ignore_index=True)
+        fl_encoder = LabelEncoder()
+        r_fl = fl_encoder.fit_transform(all_user['Favorite Icecream'])
+        all_labels_user = pd.DataFrame({'Height': all_user['Height'],'Favorite Icecream':r_fl, 'Like Liquorice': all_user['Like Liquorice'], 'First Time London': all_user['First Time London']})
+        real_labels_user = all_labels_user[:len(st.session_state.real_data)]
+        user_labels = all_labels_user.tail(1)
+        nn_user = NearestNeighbors(n_neighbors=1, metric="euclidean")
+        nn_user.fit(real_labels_user)
+        distance_user, index_user = nn_user.kneighbors(user_labels)
+        st.session_state.indiv_index = index_user[0][0]
         st.session_state.selected_epsilons = []
-    if "scatter_data" not in st.session_state:
         st.session_state.scatter_data = {}
-    st.session_state.epsilon = st.selectbox("What ε-value do you wich to use to synthesize your dataset (lower = more private)?", (0.02, 0.05, 0.1, 0.2, 0.5, 1, 2.5, 5))
-    if st.session_state.epsilon not in st.session_state.selected_epsilons:
-        st.session_state.selected_epsilons.append(st.session_state.epsilon)
-    
-    st.title("Real vs. Synthetic Data Comparison")
-    if st.session_state.epsilon not in st.session_state.scatter_data:
-        with st.spinner("Gathering data..."):
-            get_data(st.session_state.epsilon)
-            st.session_state.scatter_data[st.session_state.epsilon] = {
-                "real_coords": st.session_state.real_coords_tsne,
-                "syn_coords": st.session_state.syn_coords_tsne
-            }
-    # Ensure only the last two epsilons are stored
-    if len(st.session_state.selected_epsilons) > 2:
-        oldest_epsilon = st.session_state.selected_epsilons.pop(0)
-        st.session_state.scatter_data.pop(oldest_epsilon, None)  # Remove old data safely
 
-    # Access stored data for the new epsilon
-    real_coords = st.session_state.scatter_data[st.session_state.epsilon]["real_coords"]
-    syn_coords_new = st.session_state.scatter_data[st.session_state.epsilon]["syn_coords"]
+    st.button(label="Gather insights", on_click=set_state, args=[2])
 
-    # Get synthetic data for the previous epsilon (if available)
-    if len(st.session_state.selected_epsilons) > 1:
-        prev_eps = st.session_state.selected_epsilons[0]
-        syn_coords_old = st.session_state.scatter_data.get(prev_eps, {}).get("syn_coords", [])
-    else:
-        syn_coords_old = []  # Empty if only one epsilon has been used
-    
-    col1, col2 = st.columns(2, border=True)
-    with col1:
-        st.subheader("Real Dataset")
-        st.write(f"#Individuals:", len(st.session_state.real_data))
-        num_unique_trans = pd.DataFrame(st.session_state.real_data.nunique()).transpose()
-        num_unique = pd.DataFrame(num_unique_trans, columns = st.session_state.real_data.columns)
-        st.write(f"#Unique values:")
-        st.dataframe(num_unique, use_container_width=True, hide_index=True)
-        most_frequent_real = pd.DataFrame(st.session_state.real_data.apply(lambda col: col.value_counts().idxmax()))
-        most_frequent_real_df = pd.DataFrame(most_frequent_real.transpose(), columns=st.session_state.real_data.columns).transpose()
-        st.write(f"Mode of each column:")
-        st.dataframe(most_frequent_real_df, use_container_width=True, column_config={"0":"Mode"})
-        st.write(f"Summary Statistics:")
-        st.dataframe(round(st.session_state.real_data.describe()[1:], 2), use_container_width=True)
-    
-    with col2:
-        st.subheader(f"Synthetic Dataset using ε={st.session_state.epsilon}")
-        st.write(f"#Individuals:",len(st.session_state.syn_data_bin))
-        num_unique_trans_syn = pd.DataFrame(st.session_state.syn_data_bin.nunique()).transpose()
-        num_unique_syn = pd.DataFrame(num_unique_trans_syn, columns = st.session_state.syn_data_bin.columns)
-        st.write(f"#Unique values:")
-        st.dataframe(num_unique_syn, use_container_width=True, hide_index=True)
-        most_frequent_syn = pd.DataFrame(st.session_state.syn_data_bin.apply(lambda col: col.value_counts().idxmax()))
-        most_frequent_syn_df = pd.DataFrame(most_frequent_syn.transpose(), columns=st.session_state.syn_data_bin.columns).transpose()
-        st.write(f"Mode of each column:")
-        st.dataframe(most_frequent_syn_df, use_container_width=True, column_config={"0":"Mode"})
-        st.write(f"Summary Statistics:")
-        st.dataframe(round(st.session_state.syn_data_bin.describe()[1:], 2), use_container_width=True)
-    
-    col1, col2 = st.columns(2)
-    with col1:
-        st.subheader(f"Scatter Plot of the Real and Synthetic Datasets")
-        if len(syn_coords_old) == 0:
-            st.pyplot(scatter_plot_tsne(real_coords, syn_coords_new))
-            st.write("*Scatter plot of real (blue), synthetic (red), and your (yellow) data, that has been mapped to 2 dimensions using t-SNE.*")
-        else:
-            st.pyplot(scatter_plot_tsne_old_new(real_coords, syn_coords_old, syn_coords_new))
-            st.write(f"*Scatter plot of real (blue), previous synthetic using ε={st.session_state.selected_epsilons[0]} (green), new synthetic using ε={st.session_state.selected_epsilons[1]} (red), and your (yellow) data, that has been mapped to 2 dimensions using t-SNE.*")
-    with st.popover("Continue storyline"):
-        st.subheader("Hi again 👋 This is the story elaborating your goal as a researcher trying to generate private synthetic data.")
-        st.write("You have now generate a 'hopefully' private synthetic dataset.")
-        st.write("You want to publish your synthetic dataset, but what does this mean for the privacy of you and the other individuals in the dataset?")
-        st.write("Using privacy metrics, we can measure how private the synthetic dataset is... or can we?")
-    st.title(f"What is The Risk When Publishing The Data?")
-    st.write("Click the button to estimate the privacy using a variety of privacy metrics ⬇️")
-    st.button(label="Measure Privacy", on_click=set_state, args=[2])
-
-if st.session_state.stage == 2:#Metric Reults
-    st.title("Synthetic Data Generation")
+if st.session_state.stage == 2:#Summary statistics
+    st.title("Synthetic Data Utility Insights")
+    st.write("This page provides insights into the utility of the synthetic dataset compared to the real dataset.")
     st.subheader("Assume this is you:")
     st.dataframe(st.session_state.real_data.iloc[[st.session_state.indiv_index]], use_container_width=True, hide_index=True)
-    st.write("*Based on your input, this person in the dataset is most like you.*")
-    st.write("This data is in the real dataset, and using the epsilon you desired, a synthetic dataset has been generated.")
-    st.session_state.epsilon = st.selectbox("What ε-value do you wich to use to synthesize your dataset (lower = more private)?", (0.02, 0.05, 0.1, 0.2, 0.5, 1, 2.5, 5))
+    if st.session_state.uploaded:
+        st.write("*You have been assigned a random index in the dataset, and the individual with that index is now you.*")
+    else:
+        st.write("*Based on your input, this person in the dataset is most like you.*")
+        st.write("This data is in the real dataset, and using the epsilon you desired, a synthetic dataset has been generated.")
+    
+        if "selected_epsilons" not in st.session_state:
+            st.session_state.selected_epsilons = []
+        if "scatter_data" not in st.session_state:
+            st.session_state.scatter_data = {}
+        st.session_state.epsilon = st.selectbox("What ε-value do you wich to use to synthesize your dataset (lower = more private)?", (0.02, 0.05, 0.1, 0.2, 0.5, 1, 2.5, 5))
+        if st.session_state.epsilon not in st.session_state.selected_epsilons:
+            st.session_state.selected_epsilons.append(st.session_state.epsilon)
     
     st.title("Real vs. Synthetic Data Comparison")
-    with st.spinner("Generating synthetic data..."):
-        get_data(st.session_state.epsilon)
     
-    col1, col2 = st.columns(2, border=True)
-    with col1:
-        st.subheader("Real Dataset")
-        st.write(f"#Individuals:", len(st.session_state.real_data))
-        num_unique_trans = pd.DataFrame(st.session_state.real_data.nunique()).transpose()
-        num_unique = pd.DataFrame(num_unique_trans, columns = st.session_state.real_data.columns)
-        st.write(f"#Unique values:")
-        st.dataframe(num_unique, use_container_width=True, hide_index=True)
-        most_frequent_real = pd.DataFrame(st.session_state.real_data.apply(lambda col: col.value_counts().idxmax()))
-        most_frequent_real_df = pd.DataFrame(most_frequent_real.transpose(), columns=st.session_state.real_data.columns).transpose()
-        st.write(f"Mode of each variable:")
-        st.dataframe(most_frequent_real_df, use_container_width=True, column_config={"0":"Mode"})
-        st.write(f"Summary Statistics:")
-        st.dataframe(round(st.session_state.real_data.describe()[1:], 2), use_container_width=True)
-    
-    with col2:
-        st.subheader(f"Synthetic Dataset using ε={st.session_state.epsilon}")
-        st.write(f"#Individuals:",len(st.session_state.syn_data_bin))
-        num_unique_trans_syn = pd.DataFrame(st.session_state.syn_data_bin.nunique()).transpose()
-        num_unique_syn = pd.DataFrame(num_unique_trans_syn, columns = st.session_state.syn_data_bin.columns)
-        st.write(f"#Unique values:")
-        st.dataframe(num_unique_syn, use_container_width=True, hide_index=True)
-        most_frequent_syn = pd.DataFrame(st.session_state.syn_data_bin.apply(lambda col: col.value_counts().idxmax()))
-        most_frequent_syn_df = pd.DataFrame(most_frequent_syn.transpose(), columns=st.session_state.syn_data_bin.columns).transpose()
-        st.write(f"Mode of each column:")
-        st.dataframe(most_frequent_syn_df, use_container_width=True, column_config={"0":"Mode"})
-        st.write(f"Summary Statistics:")
-        st.dataframe(round(st.session_state.syn_data_bin.describe()[1:], 2), use_container_width=True)
-    
-    col1, col2 = st.columns(2)
-    with col1:
+    if st.session_state.uploaded:
+        if "real_coords_tsne" not in st.session_state or "syn_coords_tsne" not in st.session_state:
+            with st.spinner("Gathering data..."):
+                    get_uploaded_data()
+        col1, col2 = st.columns(2, border=True)
+        with col1:
+            st.subheader("Real Dataset")
+            st.write(f"#Individuals:", len(st.session_state.real_data))
+            num_unique_trans = pd.DataFrame(st.session_state.real_data.nunique()).transpose()
+            num_unique = pd.DataFrame(num_unique_trans, columns = st.session_state.real_data.columns)
+            st.write(f"#Unique values:")
+            st.dataframe(num_unique, use_container_width=True, hide_index=True)
+            most_frequent_real = pd.DataFrame(st.session_state.real_data.apply(lambda col: col.value_counts().idxmax()))
+            most_frequent_real_df = pd.DataFrame(most_frequent_real.transpose(), columns=st.session_state.real_data.columns).transpose()
+            st.write(f"Mode of each column:")
+            st.dataframe(most_frequent_real_df, use_container_width=True, column_config={"0":"Mode"})
+            st.write(f"Summary Statistics:")
+            st.dataframe(round(st.session_state.real_data.describe()[1:], 2), use_container_width=True)
+        
+        with col2:
+            st.subheader(f"Synthetic Dataset")
+            st.write(f"#Individuals:",len(st.session_state.syn_data_bin))
+            num_unique_trans_syn = pd.DataFrame(st.session_state.syn_data_bin.nunique()).transpose()
+            num_unique_syn = pd.DataFrame(num_unique_trans_syn, columns = st.session_state.syn_data_bin.columns)
+            st.write(f"#Unique values:")
+            st.dataframe(num_unique_syn, use_container_width=True, hide_index=True)
+            most_frequent_syn = pd.DataFrame(st.session_state.syn_data_bin.apply(lambda col: col.value_counts().idxmax()))
+            most_frequent_syn_df = pd.DataFrame(most_frequent_syn.transpose(), columns=st.session_state.syn_data_bin.columns).transpose()
+            st.write(f"Mode of each column:")
+            st.dataframe(most_frequent_syn_df, use_container_width=True, column_config={"0":"Mode"})
+            st.write(f"Summary Statistics:")
+            st.dataframe(round(st.session_state.syn_data_bin.describe()[1:], 2), use_container_width=True)
+        
         st.subheader(f"Scatter Plot of the Real and Synthetic Datasets")
-        st.pyplot(scatter_plot_tsne(st.session_state.real_coords_tsne, st.session_state.syn_coords_tsne))
-        st.write("*Scatter plot of real (blue), synthetic (red), and your (yellow) data, that has been mapped to 2 dimensions using t-SNE.*")
-    with st.popover("Continue storyline"):
-        st.subheader("Hi again 👋 This is the story elaborating your goal as a researcher trying to generate private synthetic data.")
-        st.write("You have now generate a 'hopefully' private synthetic dataset.")
-        st.write("You want to publish your synthetic dataset, but what does this mean for the privacy of you and the other individuals in the dataset?")
-        st.write("Using privacy metrics, we can measure how private the synthetic dataset is... or can we?")
+        col1, col2 = st.columns(2)
+        with col1:
+            st.pyplot(scatter_plot_tsne(st.session_state.real_coords_tsne, st.session_state.syn_coords_tsne))
+            st.write(f"*Scatter plot of real (blue), synthetic (red), and your assigned data (yellow), that has been mapped to 2 dimensions using t-SNE.*")
+        with st.popover("Continue storyline"):
+            st.subheader("Hi again 👋 This is the story elaborating your goal as a researcher trying to generate private synthetic data.")
+            st.write("You have now generated a 'hopefully' private synthetic dataset.")
+            st.write("You want to publish your synthetic dataset, but what does this mean for the privacy of you and the other individuals in the dataset?")
+            st.write("Using privacy metrics, we can measure how private the synthetic dataset is... or can we?")
+        st.title(f"What is The Risk When Publishing The Data?")
+        st.write("Click the button to estimate the privacy using a variety of privacy metrics ⬇️")
+
+    if not st.session_state.uploaded:
+        if st.session_state.epsilon not in st.session_state.scatter_data:
+            with st.spinner("Gathering data..."):
+                get_data(st.session_state.epsilon)
+                st.session_state.scatter_data[st.session_state.epsilon] = {
+                    "real_coords": st.session_state.real_coords_tsne,
+                    "syn_coords": st.session_state.syn_coords_tsne
+                }
+        # Ensure only the last two epsilons are stored
+        if len(st.session_state.selected_epsilons) > 2:
+            oldest_epsilon = st.session_state.selected_epsilons.pop(0)
+            st.session_state.scatter_data.pop(oldest_epsilon, None)  # Remove old data safely
+
+        # Access stored data for the new epsilon
+        real_coords = st.session_state.scatter_data[st.session_state.epsilon]["real_coords"]
+        syn_coords_new = st.session_state.scatter_data[st.session_state.epsilon]["syn_coords"]
+
+        # Get synthetic data for the previous epsilon (if available)
+        if len(st.session_state.selected_epsilons) > 1:
+            prev_eps = st.session_state.selected_epsilons[0]
+            syn_coords_old = st.session_state.scatter_data.get(prev_eps, {}).get("syn_coords", [])
+        else:
+            syn_coords_old = []  # Empty if only one epsilon has been used
     
-    with open("sensitive_attributes.txt", "r") as sensitive_file:
-        sensitive_attributes = sensitive_file.read().splitlines()
-    st.session_state.is_sens_cont = any(st.session_state.real_data[attr].dtype == 'float64' for attr in sensitive_attributes if attr in st.session_state.real_data.columns)
+        col1, col2 = st.columns(2, border=True)
+        with col1:
+            st.subheader("Real Dataset")
+            st.write(f"#Individuals:", len(st.session_state.real_data))
+            num_unique_trans = pd.DataFrame(st.session_state.real_data.nunique()).transpose()
+            num_unique = pd.DataFrame(num_unique_trans, columns = st.session_state.real_data.columns)
+            st.write(f"#Unique values:")
+            st.dataframe(num_unique, use_container_width=True, hide_index=True)
+            most_frequent_real = pd.DataFrame(st.session_state.real_data.apply(lambda col: col.value_counts().idxmax()))
+            most_frequent_real_df = pd.DataFrame(most_frequent_real.transpose(), columns=st.session_state.real_data.columns).transpose()
+            st.write(f"Mode of each column:")
+            st.dataframe(most_frequent_real_df, use_container_width=True, column_config={"0":"Mode"})
+            st.write(f"Summary Statistics:")
+            st.dataframe(round(st.session_state.real_data.describe()[1:], 2), use_container_width=True)
+        
+        with col2:
+            st.subheader(f"Synthetic Dataset using ε={st.session_state.epsilon}")
+            st.write(f"#Individuals:",len(st.session_state.syn_data_bin))
+            num_unique_trans_syn = pd.DataFrame(st.session_state.syn_data_bin.nunique()).transpose()
+            num_unique_syn = pd.DataFrame(num_unique_trans_syn, columns = st.session_state.syn_data_bin.columns)
+            st.write(f"#Unique values:")
+            st.dataframe(num_unique_syn, use_container_width=True, hide_index=True)
+            most_frequent_syn = pd.DataFrame(st.session_state.syn_data_bin.apply(lambda col: col.value_counts().idxmax()))
+            most_frequent_syn_df = pd.DataFrame(most_frequent_syn.transpose(), columns=st.session_state.syn_data_bin.columns).transpose()
+            st.write(f"Mode of each column:")
+            st.dataframe(most_frequent_syn_df, use_container_width=True, column_config={"0":"Mode"})
+            st.write(f"Summary Statistics:")
+            st.dataframe(round(st.session_state.syn_data_bin.describe()[1:], 2), use_container_width=True)
+        
+        col1, col2 = st.columns(2)
+        st.subheader(f"Scatter Plot of the Real and Synthetic Datasets")
+        with col1:
+            if len(syn_coords_old) == 0:
+                st.pyplot(scatter_plot_tsne(real_coords, syn_coords_new))
+                st.write("*Scatter plot of real (blue), synthetic (red), and your (yellow) data, that has been mapped to 2 dimensions using t-SNE.*")
+            else:
+                st.pyplot(scatter_plot_tsne_old_new(real_coords, syn_coords_old, syn_coords_new))
+                st.write(f"*Scatter plot of real (blue), previous synthetic using ε={st.session_state.selected_epsilons[0]} (green), new synthetic using ε={st.session_state.selected_epsilons[1]} (red), and your (yellow) data, that has been mapped to 2 dimensions using t-SNE.*")
+        with st.popover("Continue storyline"):
+            st.subheader("Hi again 👋 This is the story elaborating your goal as a researcher trying to generate private synthetic data.")
+            st.write("You have now generated a 'hopefully' private synthetic dataset.")
+            st.write("You want to publish your synthetic dataset, but what does this mean for the privacy of you and the other individuals in the dataset?")
+            st.write("Using privacy metrics, we can measure how private the synthetic dataset is... or can we?")
+        st.title(f"What is The Risk When Publishing The Data?")
+        st.write("Click the button to estimate the privacy using a variety of privacy metrics ⬇️")
+        
+    st.button(label="Measure Privacy", on_click=set_state, args=[3])
+
+if st.session_state.stage == 3:#Metric Reults
+    #KEPT UTILITY PART FROM BEFORE
+    st.title("Synthetic Data Utility Insights")
+    st.write("This page provides insights into the utility of the synthetic dataset compared to the real dataset.")
+    st.subheader("Assume this is you:")
+    st.dataframe(st.session_state.real_data.iloc[[st.session_state.indiv_index]], use_container_width=True, hide_index=True)
+    if st.session_state.uploaded:
+        st.write("*You have been assigned a random index in the dataset, and the individual with that index is now you.*")
+    else:
+        st.write("*Based on your input, this person in the dataset is most like you.*")
+        st.write("This data is in the real dataset, and using the epsilon you desired, a synthetic dataset has been generated.")
+    
+        if "selected_epsilons" not in st.session_state:
+            st.session_state.selected_epsilons = []
+        if "scatter_data" not in st.session_state:
+            st.session_state.scatter_data = {}
+        st.session_state.epsilon = st.selectbox("What ε-value do you wich to use to synthesize your dataset (lower = more private)?", (0.02, 0.05, 0.1, 0.2, 0.5, 1, 2.5, 5))
+        if st.session_state.epsilon not in st.session_state.selected_epsilons:
+            st.session_state.selected_epsilons.append(st.session_state.epsilon)
+    
+    st.title("Real vs. Synthetic Data Comparison")
+    
+    if st.session_state.uploaded:
+        if "real_coords_tsne" not in st.session_state or "syn_coords_tsne" not in st.session_state:
+            with st.spinner("Gathering data..."):
+                    get_uploaded_data()
+        col1, col2 = st.columns(2, border=True)
+        with col1:
+            st.subheader("Real Dataset")
+            st.write(f"#Individuals:", len(st.session_state.real_data))
+            num_unique_trans = pd.DataFrame(st.session_state.real_data.nunique()).transpose()
+            num_unique = pd.DataFrame(num_unique_trans, columns = st.session_state.real_data.columns)
+            st.write(f"#Unique values:")
+            st.dataframe(num_unique, use_container_width=True, hide_index=True)
+            most_frequent_real = pd.DataFrame(st.session_state.real_data.apply(lambda col: col.value_counts().idxmax()))
+            most_frequent_real_df = pd.DataFrame(most_frequent_real.transpose(), columns=st.session_state.real_data.columns).transpose()
+            st.write(f"Mode of each column:")
+            st.dataframe(most_frequent_real_df, use_container_width=True, column_config={"0":"Mode"})
+            st.write(f"Summary Statistics:")
+            st.dataframe(round(st.session_state.real_data.describe()[1:], 2), use_container_width=True)
+        
+        with col2:
+            st.subheader(f"Synthetic Dataset")
+            st.write(f"#Individuals:",len(st.session_state.syn_data_bin))
+            num_unique_trans_syn = pd.DataFrame(st.session_state.syn_data_bin.nunique()).transpose()
+            num_unique_syn = pd.DataFrame(num_unique_trans_syn, columns = st.session_state.syn_data_bin.columns)
+            st.write(f"#Unique values:")
+            st.dataframe(num_unique_syn, use_container_width=True, hide_index=True)
+            most_frequent_syn = pd.DataFrame(st.session_state.syn_data_bin.apply(lambda col: col.value_counts().idxmax()))
+            most_frequent_syn_df = pd.DataFrame(most_frequent_syn.transpose(), columns=st.session_state.syn_data_bin.columns).transpose()
+            st.write(f"Mode of each column:")
+            st.dataframe(most_frequent_syn_df, use_container_width=True, column_config={"0":"Mode"})
+            st.write(f"Summary Statistics:")
+            st.dataframe(round(st.session_state.syn_data_bin.describe()[1:], 2), use_container_width=True)
+        
+        st.subheader(f"Scatter Plot of the Real and Synthetic Datasets")
+        col1, col2 = st.columns(2)
+        with col1:
+            st.pyplot(scatter_plot_tsne(st.session_state.real_coords_tsne, st.session_state.syn_coords_tsne))
+            st.write(f"*Scatter plot of real (blue), synthetic (red), and your assigned data (yellow), that has been mapped to 2 dimensions using t-SNE.*")
+        with st.popover("Continue storyline"):
+            st.subheader("Hi again 👋 This is the story elaborating your goal as a researcher trying to generate private synthetic data.")
+            st.write("You have now generated a 'hopefully' private synthetic dataset.")
+            st.write("You want to publish your synthetic dataset, but what does this mean for the privacy of you and the other individuals in the dataset?")
+            st.write("Using privacy metrics, we can measure how private the synthetic dataset is... or can we?")
+
+    if not st.session_state.uploaded:
+        if st.session_state.epsilon not in st.session_state.scatter_data:
+            with st.spinner("Gathering data..."):
+                get_data(st.session_state.epsilon)
+                st.session_state.scatter_data[st.session_state.epsilon] = {
+                    "real_coords": st.session_state.real_coords_tsne,
+                    "syn_coords": st.session_state.syn_coords_tsne
+                }
+        # Ensure only the last two epsilons are stored
+        if len(st.session_state.selected_epsilons) > 2:
+            oldest_epsilon = st.session_state.selected_epsilons.pop(0)
+            st.session_state.scatter_data.pop(oldest_epsilon, None)  # Remove old data safely
+
+        # Access stored data for the new epsilon
+        real_coords = st.session_state.scatter_data[st.session_state.epsilon]["real_coords"]
+        syn_coords_new = st.session_state.scatter_data[st.session_state.epsilon]["syn_coords"]
+
+        # Get synthetic data for the previous epsilon (if available)
+        if len(st.session_state.selected_epsilons) > 1:
+            prev_eps = st.session_state.selected_epsilons[0]
+            syn_coords_old = st.session_state.scatter_data.get(prev_eps, {}).get("syn_coords", [])
+        else:
+            syn_coords_old = []  # Empty if only one epsilon has been used
+    
+        col1, col2 = st.columns(2, border=True)
+        with col1:
+            st.subheader("Real Dataset")
+            st.write(f"#Individuals:", len(st.session_state.real_data))
+            num_unique_trans = pd.DataFrame(st.session_state.real_data.nunique()).transpose()
+            num_unique = pd.DataFrame(num_unique_trans, columns = st.session_state.real_data.columns)
+            st.write(f"#Unique values:")
+            st.dataframe(num_unique, use_container_width=True, hide_index=True)
+            most_frequent_real = pd.DataFrame(st.session_state.real_data.apply(lambda col: col.value_counts().idxmax()))
+            most_frequent_real_df = pd.DataFrame(most_frequent_real.transpose(), columns=st.session_state.real_data.columns).transpose()
+            st.write(f"Mode of each column:")
+            st.dataframe(most_frequent_real_df, use_container_width=True, column_config={"0":"Mode"})
+            st.write(f"Summary Statistics:")
+            st.dataframe(round(st.session_state.real_data.describe()[1:], 2), use_container_width=True)
+        
+        with col2:
+            st.subheader(f"Synthetic Dataset using ε={st.session_state.epsilon}")
+            st.write(f"#Individuals:",len(st.session_state.syn_data_bin))
+            num_unique_trans_syn = pd.DataFrame(st.session_state.syn_data_bin.nunique()).transpose()
+            num_unique_syn = pd.DataFrame(num_unique_trans_syn, columns = st.session_state.syn_data_bin.columns)
+            st.write(f"#Unique values:")
+            st.dataframe(num_unique_syn, use_container_width=True, hide_index=True)
+            most_frequent_syn = pd.DataFrame(st.session_state.syn_data_bin.apply(lambda col: col.value_counts().idxmax()))
+            most_frequent_syn_df = pd.DataFrame(most_frequent_syn.transpose(), columns=st.session_state.syn_data_bin.columns).transpose()
+            st.write(f"Mode of each column:")
+            st.dataframe(most_frequent_syn_df, use_container_width=True, column_config={"0":"Mode"})
+            st.write(f"Summary Statistics:")
+            st.dataframe(round(st.session_state.syn_data_bin.describe()[1:], 2), use_container_width=True)
+        
+        col1, col2 = st.columns(2)
+        st.subheader(f"Scatter Plot of the Real and Synthetic Datasets")
+        with col1:
+            if len(syn_coords_old) == 0:
+                st.pyplot(scatter_plot_tsne(real_coords, syn_coords_new))
+                st.write("*Scatter plot of real (blue), synthetic (red), and your (yellow) data, that has been mapped to 2 dimensions using t-SNE.*")
+            else:
+                st.pyplot(scatter_plot_tsne_old_new(real_coords, syn_coords_old, syn_coords_new))
+                st.write(f"*Scatter plot of real (blue), previous synthetic using ε={st.session_state.selected_epsilons[0]} (green), new synthetic using ε={st.session_state.selected_epsilons[1]} (red), and your (yellow) data, that has been mapped to 2 dimensions using t-SNE.*")
+        with st.popover("Continue storyline"):
+            st.subheader("Hi again 👋 This is the story elaborating your goal as a researcher trying to generate private synthetic data.")
+            st.write("You have now generated a 'hopefully' private synthetic dataset.")
+            st.write("You want to publish your synthetic dataset, but what does this mean for the privacy of you and the other individuals in the dataset?")
+            st.write("Using privacy metrics, we can measure how private the synthetic dataset is... or can we?")
+
+    #PRIVACY PART:
+    
+    st.session_state.is_sens_cont = any(st.session_state.real_data[attr].dtype == 'float64' for attr in st.session_state.sensitive_attributes if attr in st.session_state.real_data.columns)
     st.session_state.has_continuous = not st.session_state.real_data.select_dtypes(include=['float64']).empty                  
     st.session_state.is_large = st.session_state.real_data.shape[1] > 3
     subtitle = ""
@@ -1190,7 +1411,7 @@ if st.session_state.stage == 10: #AIR
         if st.session_state.air_prot == '✅':
             st.subheader("Your data is safe!✅")
         st.write("AIR measures the risk of inference attacks by assessing how easily an attacker, using public real data and synthetic data, can infer sensitive values. It quantifies this difficulty with the a weighted F1-score.")
-        st.write("The scenario for the attacker is, that the attacker has acces to the synthetic data, and knows something about a specific individual. The attacker the wants to infer information that he does not know about the individual from the synthetic data publication.")
+        st.write("The scenario for the attacker is, that the attacker has access to the synthetic data, and knows something about a specific individual. The attacker wants to infer information that he does not know about the individual from the synthetic data publication.")
         st.subheader("How is your score calculated?")
         st.write("Your sensitive field is whether or not you like liquorice. Lets try to infer it using your key fields.")
         st.write("The key fields are:")
@@ -1307,7 +1528,7 @@ if st.session_state.stage == 11: #GCAP
         if st.session_state.gcap_prot == '✅':
             st.subheader("Your data is safe!✅")
         st.write("GCAP measures the risk of inference attacks by assessing how easily an attacker, using public real data and synthetic data, can infer sensitive values. It quantifies this difficulty with the Correct Attribution Probability (CAP) algorithm.")
-        st.write("The scenario for the attacker is, that the attacker has acces to the synthetic data, and knows something about a specific individual. The attacker the wants to infer information that he does not know about the individual from the synthetic data publication.")
+        st.write("The scenario for the attacker is, that the attacker has access to the synthetic data, and knows something about a specific individual. The attacker wants to infer information that he does not know about the individual from the synthetic data publication.")
         st.subheader("How is your score calculated?")
         st.write("Your sensitive field is whether or not you like liquorice. Lets try to infer it using your key fields.")
         st.write("Your key fields are:")
@@ -1384,7 +1605,7 @@ if st.session_state.stage == 12: #ZCAP
         if st.session_state.zcap_prot == '✅':
             st.subheader("Your data is safe!✅")
         st.write("ZCAP measures the risk of inference attacks by assessing how easily an attacker, using public real data and synthetic data, can infer sensitive values. It quantifies this difficulty with the Correct Attribution Probability (CAP) algorithm.")
-        st.write("The scenario for the attacker is, that the attacker has acces to the synthetic data, and knows something about a specific individual. The attacker the wants to infer information that he does not know about the individual from the synthetic data publication.")
+        st.write("The scenario for the attacker is, that the attacker has access to the synthetic data, and knows something about a specific individual. The attacker wants to infer information that he does not know about the individual from the synthetic data publication.")
         
         st.subheader("How is your score calculated?")
         st.write("Your sensitive field is whether or not you like liquorice. Lets try to infer it using your key fields.")
@@ -1462,6 +1683,7 @@ if st.session_state.stage == 13: #MDCR
         if st.session_state.mdcr_prot == '✅':
             st.subheader("Your data is safe!✅")
         st.write("MDCR measures the risk of re-identification by assessing how easily an attacker, using the synthetic data, can infer the individual from which it was generated.")
+        st.write("The scenario for the attacker is, that the attacker has access to the synthetic data, and may know something about a specific individual. The attacker wants to re-identify that specific individual in the synthetic dataset through a measure of distance. How successful will he be?")
         
         st.subheader("How is your score calculated?")
         st.write("Your nearest neighbours are:")
@@ -1564,7 +1786,7 @@ if st.session_state.stage == 14: #Hitting Rate
         if st.session_state.hitr_prot == '✅':
             st.subheader("Your data is safe!✅")
         st.write("HitR measures the risk of identifying whether an individual contributed their data to the real dataset while having access to the synthetic data.")
-        
+        st.write("The scenario for the attacker is, that the attacker has access to the synthetic data, and may know something about a specific individual. The attacker wants to determine whether that specific individual is present in the synthetic dataset through a measure of equality. How successful will he be?")
             
         st.subheader("How is your score calculated?")
         st.write("To identify whether or not you contributed your data, the metrics tries to find individuals with matching categorical and similar continuous attribute values.")
@@ -1633,7 +1855,8 @@ if st.session_state.stage == 15: #MIR
         if st.session_state.mir_prot == '✅':
             st.subheader("Your data is safe!✅")
         st.write("MIR estimates the risk of identifying whether an individual contributed their data to the real dataset while having access to the synthetic data and a subset of the real data.")
-            
+        st.write("The scenario for the attacker is, that the attacker has access to the synthetic data, and may know something about a specific individual. The attacker wants to determine whether that specific individual is present in the synthetic dataset through a measure of statistical similarity. How successful will he be?")
+
         st.subheader("Risk estimation of the dataset")
         st.write("The attacker follows four steps to identify individuals:")
         st.write("1. Make a new dataset that contains both the real and synthetic data as well as a labeling of whether or not the are real.")
@@ -1687,7 +1910,8 @@ if st.session_state.stage == 16: #NNAA
         if st.session_state.nnaa_prot == '✅':
             st.subheader("Your data is safe!✅")
         st.write('''NNAA estimates the risk of identifying whether an individual contributed their data to the real dataset while only having access to the synthetic data.''')
-        
+        st.write("The scenario for the attacker is, that the attacker has access to the synthetic data, and may know something about a specific individual. The attacker wants to determine whether that specific individual is present in the synthetic dataset through a measure of distance. How successful will he be?")
+
         st.subheader("How is your score calculated?")
         target_value = st.session_state.indiv_index
         indices = np.argwhere(st.session_state.idx_syn_real_gower[:, 0] == target_value)
@@ -1796,6 +2020,7 @@ if st.session_state.stage == 17: #CRP
         if st.session_state.crp_prot == '✅':
             st.subheader("Your data is safe!✅")
         st.write("CRP measures the risk of re-identification as a probability of a real individual's row being a row in the synthetic data.")
+        st.write("The scenario for the attacker is, that the attacker has access to the synthetic data, and may know something about a specific individual. The attacker wants to re-identify that specific individual in the synthetic dataset through a measure of equality. How successful will he be?")
         
         st.subheader("How is your score calculated?")
         st.write("Your score is determined by whther you have a synthetic individual exactly matching your data.")
@@ -1857,6 +2082,7 @@ if st.session_state.stage == 18: #NSND
             st.subheader("Your data is safe!✅")
         
         st.write("NSND measures the risk of re-identification by assessing how easily an attacker, using the synthetic data, can infer the individual from which it was generated through a distance measure.")
+        st.write("The scenario for the attacker is, that the attacker has access to the synthetic data, and may know something about a specific individual. The attacker wants to re-identify that specific individual in the synthetic dataset through a measure of distance. How successful will he be?")
         
         st.subheader("How is your score calculated?")
         st.write("Your nearest synthetic neighbour:")
@@ -1929,6 +2155,7 @@ if st.session_state.stage == 19: #CVP
         if st.session_state.cvp_prot == '✅':
             st.subheader("Your data is safe!✅")
         st.write("CVP measures the risk of re-identification by assessing how easily an attacker, using the synthetic data, can infer the individual from which it was generated.")
+        st.write("The scenario for the attacker is, that the attacker has access to the synthetic data, and may know something about a specific individual. The attacker wants to re-identify that specific individual in the synthetic dataset through a measure of closeness. How successful will he be?")
         
         st.subheader("How is your score calculated?")
         
@@ -2007,6 +2234,7 @@ if st.session_state.stage == 20: #DVP
         if st.session_state.dvp_prot == '✅':
             st.subheader("Your data is safe!✅")
         st.write("DVP measures the risk of re-identification by assessing how easily an attacker, using the synthetic data, can infer the individual from which it was generated.")
+        st.write("The scenario for the attacker is, that the attacker has access to the synthetic data, and may know something about a specific individual. The attacker wants to re-identify that specific individual in the synthetic dataset through a measure of reverse closeness. How successful will he be?")
         
         st.subheader("How is your score calculated?")
         st.write("Your nearest synthetic neighbour:")
@@ -2082,8 +2310,11 @@ if st.session_state.stage == 21: #Authenticity
             st.subheader("Your data might be at risk!⚠️")
         if st.session_state.auth_prot == '✅':
             st.subheader("Your data is safe!✅")
+        st.write("Authenticity measures the risk of re-identification by assessing how easily an attacker, using the synthetic data, can infer the individual from which it was generated.")
+        st.write("The scenario for the attacker is, that the attacker has access to the synthetic data, and may know something about a specific individual. The attacker wants to re-identify that specific individual in the synthetic dataset through a measure of distance. How successful will he be?")
         
-        st.subheader("For your data")
+        
+        st.subheader("How is your score calculated?")
         col1_1, col1_2 = st.columns(2)
         with col1_1:
             st.write("Your real neighbour:")
@@ -2166,7 +2397,9 @@ if st.session_state.stage == 22: #DMLP
             st.subheader("Your data is safe!✅")
         
         st.write("D-MLP measures the risk of re-identification by assessing how easily an attacker, using the synthetic data, can infer the individual from which it was generated, while having access to a subset of the real data.")
-            
+        st.write("The scenario for the attacker is, that the attacker has access to the synthetic data, and may know something about a specific individual. The attacker wants to re-identify that specific individual in the synthetic dataset through a measure of statistical similarity. How successful will he be?")
+        
+        
         st.subheader("Risk estimation of the dataset")
         st.write("The attacker follows four steps to re-identify individuals:")
         st.write("1. Make a new dataset that contains both the real and synthetic data as well as a labeling of whether or not the are real.")
@@ -2221,6 +2454,7 @@ if st.session_state.stage == 23: #Identifiability
                 It estimates this as the probability that the distance to the closest synthetic individual is closer than the distance from the closest real individual in weighted versions of the real and synthetic dataset.
                 Here, the weight is assigned as a contribution factor for each individual attribute value.
                 ''')
+        st.write("The scenario for the attacker is, that the attacker has access to the synthetic data, and may know something about a specific individual. The attacker wants to re-identify that specific individual in the synthetic dataset through a measure of distance. How successful will he be?")
         
         X_gt_ = st.session_state.real_labels.to_numpy().reshape(len(st.session_state.real_data), -1)
         X_syn_ = st.session_state.syn_labels.to_numpy().reshape(len(st.session_state.syn_data_bin), -1)
@@ -2338,6 +2572,7 @@ if st.session_state.stage == 24: #DCR
         if st.session_state.dcr_prot == '✅':
             st.subheader("Your data is safe!✅")
         st.write("DCR measures the risk of re-identification by assessing how easily an attacker, using the synthetic data, can infer the individual from which it was generated.")
+        st.write("The scenario for the attacker is, that the attacker has access to the synthetic data, and may know something about a specific individual. The attacker wants to re-identify that specific individual in the synthetic dataset through a measure of distance. How successful will he be?")
         
         st.subheader("For your data")
         st.write("You are:")
@@ -2418,7 +2653,8 @@ if st.session_state.stage == 25: #NNDR
         if st.session_state.nndr_prot == '✅':
             st.subheader("Your data is safe!✅")
         st.write("NNDR measures the risk of re-identification by assessing how easily an attacker, using the synthetic data, can infer the individual from which it was generated.")
-        
+        st.write("The scenario for the attacker is, that the attacker has access to the synthetic data, and may know something about a specific individual. The attacker wants to determine whether that specific individual is present in the synthetic dataset through a measure of distance. How successful will he be?")
+
         st.subheader("For your data")
         st.write("You are:")
         st.dataframe(st.session_state.real_data.iloc[[st.session_state.indiv_index]], use_container_width=True, hide_index=True)
@@ -2499,7 +2735,8 @@ if st.session_state.stage == 26: #Hidden Rate
         
         st.write('''Hidden Rate estimates the risk of identifying whether an individual contributed their data to the real dataset while only having access to the synthetic data.''')
         st.write("Hidden Rate test for each record if the nearest synthetic individual is the one generated by the real individual itself.")
-        
+        st.write("The scenario for the attacker is, that the attacker has access to the synthetic data, and may know something about a specific individual. The attacker wants to determine whether that specific individual is present in the synthetic dataset through a measure of distance. How successful will he be?")
+
         st.subheader("For your data")
         st.write("Your index is:", st.session_state.indiv_index)
         st.write("Your syn neighbour:")
@@ -2541,5 +2778,7 @@ if st.session_state.stage == 26: #Hidden Rate
         st.pyplot(scatter_plot(st.session_state.coord_real, st.session_state.syn_coords))
     
     st.button(label="Go Back", on_click=set_state, args=[2])
-        
-st.button(label="Start Over", on_click=set_state, args=[0])
+
+if st.session_state.stage != 0:
+    if st.button(label="Start Over"):
+        del st.session_state['stage']

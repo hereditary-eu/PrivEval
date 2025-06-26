@@ -10,17 +10,18 @@ from copy import deepcopy
 from sklearn.neighbors import NearestNeighbors
 
 
-def calculate_metric(args, _real_data, _synthetic):
+def calculate_metric(args, _real_data, _synthetic, sensitive_attributes=None):
     real_data = deepcopy(_real_data)
     syn_data = deepcopy(_synthetic)
 
     num_samples = len(real_data)
     
     #Load the sentive attributes from sensitive_attributes.txt
-    sensitive_file = open("sensitive_attributes.txt", "r") 
-    sensitive_data = sensitive_file.read()
-    sensitive_attributes = sensitive_data.split("\n")
-    sensitive_file.close()
+    if sensitive_attributes is None:
+        sensitive_file = open("sensitive_attributes.txt", "r")
+        sensitive_data = sensitive_file.read()
+        sensitive_attributes = sensitive_data.split("\n")
+        sensitive_file.close()
 
     #Get key attributes
     key_attributes = []
@@ -82,18 +83,21 @@ def calculate_metric(args, _real_data, _synthetic):
     
     total_air = 0
     row_counts = real_data.value_counts().reset_index(name="Count")
+    # Merge those counts back onto real_data
+    real_data_with_count = real_data.merge(row_counts, how='left')
     prob = 0
     entropy = 0
     weight = 0
     total_air = 0
     
     for i in range(len(real_data)):
-        prob = row_counts['Count'][i] / len(real_data)
+        prob = real_data_with_count['Count'].iloc[i] / len(real_data)
         entropy = prob * np.log(prob)
-        weight = (prob * np.log(prob)) / entropy
-        if TP > 0 :
+        weight = (prob * np.log(prob)) / entropy if entropy != 0 else 0
+
+        if TP > 0:
             total_air += weight * 2 * (TP / (TP + FP)) * (TP / (TP + FN)) / ((TP / (TP + FP)) + (TP / (TP + FN)))
-        else: 
+        else:
             total_air += 0
     # for i in range(len(real_data)):
     #     for j in range(len(syn_data)):

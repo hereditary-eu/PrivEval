@@ -16,7 +16,6 @@ def calculate_metric(args, _real_data, _synthetic):
     evaluator = SynthEval(train_df, holdout_dataframe = holdout_df)
 
     evaluator.evaluate(synthetic, mia_risk = {"num_eval_iter": 5})
-
     result = evaluator._raw_results['mia_risk']['MIA recall']
 
     return result
