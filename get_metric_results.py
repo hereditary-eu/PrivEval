@@ -1,7 +1,7 @@
 import pandas as pd
 import numpy as np
 from sklearn.preprocessing import LabelEncoder
-from Metrics import All_synthcity
+
 from Metrics import AttributeInference1 as AIR
 from Metrics import CGeneralizedCAP as GCAP
 from Metrics import CZeroCAP as CZCAP
@@ -11,10 +11,17 @@ from Metrics import Hitting_rate
 from Metrics import MDCR
 from Metrics import DCR
 from Metrics import NNDR
-from Metrics import Hidden_rate
+
 
 def get_metric_results(real_data, syn_data, real_labels, syn_labels, sensitive_attributes=None):
-    
+    import subprocess
+    import sys
+    from Metrics import Hidden_rate
+    import warnings
+    warnings.filterwarnings('ignore')
+
+    # Install a package (e.g., scipy)
+    #subprocess.check_call([sys.executable, "-m", "pip", "install", "scipy~=1.14.1"])
     metrics = {
                     'sanity': ['common_rows_proportion', 'nearest_syn_neighbor_distance', 'close_values_probability', 'distant_values_probability'],
                     'stats': ['alpha_precision'],
@@ -22,7 +29,11 @@ def get_metric_results(real_data, syn_data, real_labels, syn_labels, sensitive_a
                     'privacy': ['identifiability_score'],
                 }
     
-    mir = MIR.calculate_metric(args=None, _real_data=real_labels, _synthetic=syn_labels)
+    #mir = MIR.calculate_metric(args=None, _real_data=real_data, _synthetic=syn_data)
+
+
+    from Metrics import All_synthcity
+
     synthcity_results = All_synthcity.calculate_metric(args = None, _real_data=real_data, _synthetic=real_data, _metrics=metrics)
     crp = synthcity_results['mean'][1]
     nsnd = 1-synthcity_results['mean'][2]
@@ -42,7 +53,7 @@ def get_metric_results(real_data, syn_data, real_labels, syn_labels, sensitive_a
     hidd = Hidden_rate.calculate_metric(args=None, _real_data=real_labels, _synthetic=syn_labels)
      
     priv_results = np.around([air, gcap, zcap, 
-                            mdcr, hitR, mir, 
+                            mdcr, hitR, #mir, 
                             nnaa, crp, nsnd, 
                             cvp, dvp, auth, 
                             mlp, id_score, 
@@ -51,7 +62,8 @@ def get_metric_results(real_data, syn_data, real_labels, syn_labels, sensitive_a
     
     metric_list = ["Attribute Inference Risk", "GeneralizedCAP", "ZeroCAP", 
                    "Median Distance to Closest Record", "Hitting Rate",
-                   "Membership Inference Risk", "Nearest Neighbour Adversarial Accuracy",
+                   #"Membership Inference Risk", 
+                   "Nearest Neighbour Adversarial Accuracy",
                    "Common Row Proportion", "Nearest Synthetic Neighbour Distance",
                    "Close Value Probability", "Distant Value Probability",
                    "Authenticity", "DetectionMLP", "Identifiability Score"
