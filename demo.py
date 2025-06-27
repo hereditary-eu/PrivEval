@@ -26,6 +26,7 @@ from sklearn.neighbors import NearestNeighbors
 from sklearn.manifold import TSNE
 from sklearn.preprocessing import OrdinalEncoder
 from scipy.spatial.distance import cdist
+from get_metric_results import get_metric_results
 # Show the page title and description.
 st.set_page_config(page_title="Privacy Advisor", page_icon="😈", layout='wide')
 
@@ -101,6 +102,11 @@ def get_uploaded_data():
     st.session_state.tsne_df_real = pd.DataFrame(st.session_state.real_coords_tsne)
     st.session_state.tsne_df_syn = pd.DataFrame(st.session_state.syn_coords_tsne)
 
+    if list(st.session_state.real_data.columns) == ['Administrative','Administrative_Duration','Informational','Informational_Duration','ProductRelated','ProductRelated_Duration','BounceRates','ExitRates','PageValues','SpecialDay','Month','OperatingSystems','Browser','Region','TrafficType','VisitorType','Weekend','Revenue']:
+        st.session_state.metric_results_bin = pd.read_csv(f'metric_results/tabsyn_metric_results.csv', index_col=False)
+    else:
+        st.session_state.metric_results_bin = get_metric_results(st.session_state.real_data, st.session_state.syn_data_bin, st.session_state.real_labels, st.session_state.syn_labels, st.session_state.sensitive_attributes)
+    
 def scatter_plot_real(coord_real):
     your_x = coord_real['Dim. 1'].iloc[st.session_state.indiv_index]
     your_y = coord_real['Dim. 2'].iloc[st.session_state.indiv_index]
@@ -454,12 +460,15 @@ def has_problematic_synthetic_neighbors():
         return True  # All real points have sufficient synthetic neighbors
     
 def air_no_prot():
-    key_fields = ['First Name', 'Last Name', 'Height', 'Nationality', 'Favorite Icecream', 'Times Been to Italy', 'First Time London', 'Steps per Day']
+    if not st.session_state.uploaded:
+        key_fields = ['First Name', 'Last Name', 'Height', 'Nationality', 'Favorite Icecream', 'Times Been to Italy', 'First Time London', 'Steps per Day']
+    else:
+        key_fields = [col for col in st.session_state.real_data.columns if col not in st.session_state.sensitive_attributes]
     syndat=st.session_state.syn_data_bin
     dummy_real_cat, dummy_syn_cat = get_dummy_datasets(st.session_state.real_data[key_fields], syndat[key_fields])
     dummy_ind_vals = dummy_real_cat[st.session_state.indiv_index]
     idx = air_nn(dummy_ind_vals, dummy_syn_cat, k=1)
-    dummy_real_indv, dummy_syn_indv = get_dummy_datasets(st.session_state.real_data['Like Liquorice'], syndat['Like Liquorice'])
+    dummy_real_indv, dummy_syn_indv = get_dummy_datasets(st.session_state.real_data[st.session_state.sensitive_attributes], syndat[st.session_state.sensitive_attributes])
     real_label = np.array(dummy_real_indv[[st.session_state.indiv_index]])
     pred_label = np.array(dummy_syn_indv[idx])
     match = (real_label == 1) & (pred_label == 1)
@@ -476,24 +485,33 @@ def air_no_prot():
     
     return f_one*(prob_df['Weight'].iloc[st.session_state.indiv_index]) > 0
 def gcap_no_prot():
-    key_fields = ['First Name', 'Last Name', 'Height', 'Nationality', 'Favorite Icecream', 'Times Been to Italy', 'First Time London', 'Steps per Day']
+    if not st.session_state.uploaded:
+        key_fields = ['First Name', 'Last Name', 'Height', 'Nationality', 'Favorite Icecream', 'Times Been to Italy', 'First Time London', 'Steps per Day']
+    else:
+        key_fields = [col for col in st.session_state.real_data.columns if col not in st.session_state.sensitive_attributes]
     ind_vals = st.session_state.real_data[key_fields].iloc[[st.session_state.indiv_index]]
     syndat=st.session_state.syn_data_bin
     neighbour_index, neighbour, distance = nearest_neighbor_hamming(ind_vals, syndat[key_fields])
-    return syndat['Like Liquorice'].values[neighbour_index] == st.session_state.real_data['Like Liquorice'].values[st.session_state.indiv_index]
+    return syndat[st.session_state.sensitive_attributes].values[neighbour_index] == st.session_state.real_data[st.session_state.sensitive_attributes].values[st.session_state.indiv_index]
 def zcap_no_prot():
-    key_fields = ['First Name', 'Last Name', 'Height', 'Nationality', 'Favorite Icecream', 'Times Been to Italy', 'First Time London', 'Steps per Day']
+    if not st.session_state.uploaded:
+        key_fields = ['First Name', 'Last Name', 'Height', 'Nationality', 'Favorite Icecream', 'Times Been to Italy', 'First Time London', 'Steps per Day']
+    else:
+        key_fields = [col for col in st.session_state.real_data.columns if col not in st.session_state.sensitive_attributes]
     ind_vals = st.session_state.real_data[key_fields].iloc[[st.session_state.indiv_index]]
     
-    ind_like_liquorice = st.session_state.real_data.loc[st.session_state.indiv_index, 'Like Liquorice']
+    ind_like_liquorice = st.session_state.real_data.loc[st.session_state.indiv_index, st.session_state.sensitive_attributes]
     matching_rows = st.session_state.syn_data_bin[st.session_state.syn_data_bin.apply(lambda row: (ind_vals == row[key_fields]).all(axis=1).any(), axis=1)]
-    has_same_like_liquorice = (matching_rows['Like Liquorice'] == ind_like_liquorice).any()
+    has_same_like_liquorice = (matching_rows[st.session_state.sensitive_attributes] == ind_like_liquorice).any()
     return has_same_like_liquorice
 def mdcr_no_prot():
         return st.session_state.dists_real[st.session_state.indiv_index, 1] > st.session_state.dists_syn[st.session_state.indiv_index, 0]
 def hitr_no_prot():
     ind_vals = st.session_state.real_data.iloc[[st.session_state.indiv_index]]
-    cat_attr = ['First Name', 'Last Name', 'Height', 'Nationality', 'Favorite Icecream', 'Times Been to Italy', 'First Time London', 'Steps per Day']
+    if not st.session_state.uploaded:
+        cat_attr = ['First Name', 'Last Name', 'Height', 'Nationality', 'Favorite Icecream', 'Times Been to Italy', 'First Time London', 'Steps per Day']
+    else:
+        cat_attr = st.session_state.real_data.select_dtypes(include=['object']).columns
     if any((ind_vals[cat_attr] == st.session_state.syn_data_bin[cat_attr].iloc[i]).all(axis=1).any() for i in range(len(st.session_state.syn_data_bin[cat_attr]))):
         return True
     else: return False
@@ -537,7 +555,9 @@ def idS_no_prot():
     
     def compute_entropy(labels: np.ndarray) -> np.ndarray:
         from scipy.stats import entropy
-        value, counts = np.unique(np.round(labels), return_counts=True)
+        if np.issubdtype(labels.dtype, np.number):
+            labels = np.round(labels)
+        value, counts = np.unique(labels, return_counts=True)
         return entropy(counts)
     no, x_dim = X_gt_.shape
     W = np.zeros(
@@ -549,7 +569,10 @@ def idS_no_prot():
         W[i] = compute_entropy(X_gt_[:, i])
     X_hat = X_gt_
     X_syn_hat = X_syn_
-    eps = st.session_state.epsilon
+    if st.session_state.uploaded:
+        eps = 0.2 #Placeholder (can be changed)
+    else:
+        eps = st.session_state.epsilon
     W = np.ones_like(W)
     for i in range(x_dim):
         X_hat[:, i] = X_gt_[:, i] * 1.0 / (W[i] + eps)
@@ -573,7 +596,10 @@ def hidr_no_prot():
 def metric_applicability(metric_results):
     
     st.session_state.has_continuous = not st.session_state.real_data.select_dtypes(include=['float64']).empty
-    st.session_state.cont_cols = st.session_state.real_data.select_dtypes(include=['float64']).columns.tolist() + ['Steps per Day']
+    if not st.session_state.uploaded:
+        st.session_state.cont_cols = st.session_state.real_data.select_dtypes(include=['float64']).columns.tolist() + ['Steps per Day']
+    else:
+        st.session_state.cont_cols = st.session_state.real_data.select_dtypes(include=['float64']).columns.tolist()
 
     st.session_state.is_sens_cont = any(st.session_state.real_data[attr].dtype == 'float64' for attr in st.session_state.sensitive_attributes if attr in st.session_state.real_data.columns)
 
@@ -924,9 +950,9 @@ if 'stage' not in st.session_state:
     st.session_state.stage = 0
     if st.session_state.stage == 0:
         st.title("PrivEval")
-        st.subheader("Welcome to the Privacy Evaluator!")
+        st.subheader("Welcome to this privacy evaluation tool!")
         st.write("This tool helps you evaluate the privacy risks of synthetic datasets compared to real datasets.")
-        st.write("You can either upload your own datasets or use the demo datasets provided:")
+        st.write("You can either upload your own real and synthetic datasets or use the demo datasets provided:")
         col1, col2 = st.columns(2, vertical_alignment="center")
         col1.button(label="Upload your own datasets", on_click=lambda: (
             st.session_state.__setitem__('uploaded', True),
@@ -953,7 +979,7 @@ if st.session_state.stage == 1:#User input
         if real_data_file is not None:
             st.session_state.real_data = pd.read_csv(real_data_file, index_col=False)
             for col in st.session_state.real_data.columns:
-                if st.session_state.real_data[col].dtype in ['float64', 'int64']:
+                if st.session_state.real_data[col].dtype in ['float64']:
                     st.session_state.has_continuous = True
                     st.session_state.cont_cols.append(col)
                     st.session_state.is_large = len(st.session_state.real_data) > 1000
@@ -969,8 +995,12 @@ if st.session_state.stage == 1:#User input
             if st.session_state.real_data.columns.tolist() != st.session_state.syn_data_bin.columns.tolist():
                 st.error("The synthetic data must have the same columns as the real data.")
             st.write("*Synthetic data uploaded successfully!*")
-            st.write("**Which attribute is sensitive?**")
-            st.session_state.sensitive_attributes = st.selectbox("Select sensitive attribute", st.session_state.real_data.columns)
+            if list(st.session_state.real_data.columns) == ['Administrative','Administrative_Duration','Informational','Informational_Duration','ProductRelated','ProductRelated_Duration','BounceRates','ExitRates','PageValues','SpecialDay','Month','OperatingSystems','Browser','Region','TrafficType','VisitorType','Weekend','Revenue']:
+                st.write("*You are using the tabsyn dataset in which the results are pre-computed. Therefore, the sensitive attribute is locked on Revenue.*")
+                st.session_state.sensitive_attributes = st.selectbox("Select sensitive attribute", st.session_state.real_data.columns, index=st.session_state.real_data.columns.get_loc('Revenue'), disabled=True)
+            else:
+                st.write("**Which attribute is sensitive?**")
+                st.session_state.sensitive_attributes = st.selectbox("Select sensitive attribute", st.session_state.real_data.columns)
         
 
 
@@ -1000,7 +1030,8 @@ if st.session_state.stage == 1:#User input
 
         st.session_state.real_data = pd.read_csv(f'sample_data_1.csv', index_col=False)
         st.write("Which attribute is sensitive?")
-        st.session_state.sensitive_attributes = st.selectbox("Select sensitive attribute", st.session_state.real_data.columns)
+        st.write("*You are using the demo dataset in which the results are pre-computed. Therefore, the sensitive attribute is locked on Like Liquorice.*")
+        st.session_state.sensitive_attributes = st.selectbox("Select sensitive attribute", st.session_state.real_data.columns, index=st.session_state.real_data.columns.get_loc('Like Liquorice'), disabled=True)
         input_cols = ["Favorite Icecream","Like Liquorice", "First Time London", "Height"]
         all_user = pd.concat([st.session_state.real_data[input_cols], query_point], ignore_index=True)
         fl_encoder = LabelEncoder()
@@ -1018,7 +1049,7 @@ if st.session_state.stage == 1:#User input
     st.button(label="Gather insights", on_click=set_state, args=[2])
 
 if st.session_state.stage == 2:#Summary statistics
-    st.title("Synthetic Data Utility Insights")
+    st.title("Synthetic Data Insights")
     st.write("This page provides insights into the utility of the synthetic dataset compared to the real dataset.")
     st.subheader("Assume this is you:")
     st.dataframe(st.session_state.real_data.iloc[[st.session_state.indiv_index]], use_container_width=True, hide_index=True)
@@ -1156,9 +1187,9 @@ if st.session_state.stage == 2:#Summary statistics
         
     st.button(label="Measure Privacy", on_click=set_state, args=[3])
 
-if st.session_state.stage == 3:#Metric Reults
+if st.session_state.stage == 3:#Metric Results
     #KEPT UTILITY PART FROM BEFORE
-    st.title("Synthetic Data Utility Insights")
+    st.title("Synthetic Data Insights")
     st.write("This page provides insights into the utility of the synthetic dataset compared to the real dataset.")
     st.subheader("Assume this is you:")
     st.dataframe(st.session_state.real_data.iloc[[st.session_state.indiv_index]], use_container_width=True, hide_index=True)
@@ -1386,7 +1417,7 @@ if st.session_state.stage == 10: #AIR
     prob_overall = ''
     sol_overall = ''
     status_overall = '✅'
-    prob_u_txt = ''
+    
     if st.session_state.is_sens_cont:
         prob_overall += '<br>- Thresholds are easy to cheat by the synthesizer. Just make sure that sensitive data is at least the threshold away from the original sensitive field.'
         sol_overall += '<br>- Remove all continuous sensitive attributes.'
@@ -1415,7 +1446,10 @@ if st.session_state.stage == 10: #AIR
         st.subheader("How is your score calculated?")
         st.write("Your sensitive field is whether or not you like liquorice. Lets try to infer it using your key fields.")
         st.write("The key fields are:")
-        key_fields = ['First Name', 'Last Name', 'Height', 'Nationality', 'Favorite Icecream', 'Times Been to Italy', 'First Time London', 'Steps per Day']
+        if not st.session_state.uploaded:
+            key_fields = ['First Name', 'Last Name', 'Height', 'Nationality', 'Favorite Icecream', 'Times Been to Italy', 'First Time London', 'Steps per Day']
+        else:
+            key_fields = [col for col in st.session_state.real_data.columns if col not in st.session_state.sensitive_attributes]
         ind_vals = st.session_state.real_data[key_fields].iloc[[st.session_state.indiv_index]]
         st.dataframe(ind_vals, use_container_width=True, hide_index=True)
         syndat=st.session_state.syn_data_bin
@@ -1427,12 +1461,12 @@ if st.session_state.stage == 10: #AIR
         st.write("The key Fields of nearest synthetic neighbour(s) using a normalized Hamming distance is:")
         st.dataframe(syndat[key_fields].iloc[idx], use_container_width=True, hide_index=True)
         st.write("These are the sensitive fields for both individuals:")
-        dummy_real_indv, dummy_syn_indv = get_dummy_datasets(st.session_state.real_data['Like Liquorice'], syndat['Like Liquorice'])
+        dummy_real_indv, dummy_syn_indv = get_dummy_datasets(st.session_state.real_data[st.session_state.sensitive_attributes], syndat[st.session_state.sensitive_attributes])
         col1_1, col1_2 = st.columns(2)
         with col1_1:
-            st.dataframe(pd.DataFrame({'Your Sensitive Field': st.session_state.real_data['Like Liquorice'].iloc[[st.session_state.indiv_index]]}), use_container_width=True, hide_index=True)
+            st.dataframe(pd.DataFrame({'Your Sensitive Field': st.session_state.real_data[st.session_state.sensitive_attributes].iloc[[st.session_state.indiv_index]]}), use_container_width=True, hide_index=True)
         with col1_2:
-            st.dataframe(pd.DataFrame({"Neighbour's Sensitive Field": syndat['Like Liquorice'].iloc[idx]}), use_container_width=True, hide_index=True)
+            st.dataframe(pd.DataFrame({"Neighbour's Sensitive Field": syndat[st.session_state.sensitive_attributes].iloc[idx]}), use_container_width=True, hide_index=True)
         col1_1_1, col1_2_1 = st.columns(2)
         with col1_1_1:
             st.write("(One-Hot encoded)")
@@ -1496,14 +1530,14 @@ if st.session_state.stage == 10: #AIR
         st.subheader("Synthetic Dataset (One-Hot Encoded):")
         st.write(dummy_syn)
             
-    st.button(label="Go Back", on_click=set_state, args=[2])
+    st.button(label="Go Back", on_click=set_state, args=[3])
         
 if st.session_state.stage == 11: #GCAP    
     tit="Generalized Correct Attribution Probability (GCAP)"
     prob_overall = ''
     sol_overall = ''
     status_overall = '✅'
-    prob_u_txt = ''
+    
     if st.session_state.is_sens_cont:
         prob_overall += '<br>- Your sensitive attributes contain continuous variables, the metric will not work.'
         sol_overall += '<br>- Remove continuous attributes as sensitive values'
@@ -1532,7 +1566,10 @@ if st.session_state.stage == 11: #GCAP
         st.subheader("How is your score calculated?")
         st.write("Your sensitive field is whether or not you like liquorice. Lets try to infer it using your key fields.")
         st.write("Your key fields are:")
-        key_fields = ['First Name', 'Last Name', 'Height', 'Nationality', 'Favorite Icecream', 'Times Been to Italy', 'First Time London', 'Steps per Day']
+        if not st.session_state.uploaded:
+            key_fields = ['First Name', 'Last Name', 'Height', 'Nationality', 'Favorite Icecream', 'Times Been to Italy', 'First Time London', 'Steps per Day']
+        else:
+            key_fields = [col for col in st.session_state.real_data.columns if col not in st.session_state.sensitive_attributes]
         ind_vals = st.session_state.real_data[key_fields].iloc[[st.session_state.indiv_index]]
         st.dataframe(ind_vals, use_container_width=True, hide_index=True)
         syndat=st.session_state.syn_data_bin
@@ -1542,11 +1579,11 @@ if st.session_state.stage == 11: #GCAP
         st.write("These are the sensitive fields for both individuals:")
         col1_1, col1_2 = st.columns(2)
         with col1_1:
-            st.dataframe(pd.DataFrame({'Your Sensitive Field': st.session_state.real_data['Like Liquorice'].iloc[[st.session_state.indiv_index]]}), use_container_width=True, hide_index=True)
+            st.dataframe(pd.DataFrame({'Your Sensitive Field': st.session_state.real_data[st.session_state.sensitive_attributes].iloc[[st.session_state.indiv_index]]}), use_container_width=True, hide_index=True)
         with col1_2:
-            st.dataframe(pd.DataFrame({"Neighbour's Sensitive Field": syndat['Like Liquorice'].iloc[[neighbour_index]]}), use_container_width=True, hide_index=True)
+            st.dataframe(pd.DataFrame({"Neighbour's Sensitive Field": syndat[st.session_state.sensitive_attributes].iloc[[neighbour_index]]}), use_container_width=True, hide_index=True)
         
-        if syndat['Like Liquorice'].values[neighbour_index] == st.session_state.real_data['Like Liquorice'].values[st.session_state.indiv_index]:
+        if syndat[st.session_state.sensitive_attributes].values[neighbour_index] == st.session_state.real_data[st.session_state.sensitive_attributes].values[st.session_state.indiv_index]:
             st.write("⛔️You and your neighbour have matching sensitive fields!⛔️")
             st.write("The metric thereby accurately infered your sensitive data, and you increase the overall risk.")
         else:
@@ -1582,7 +1619,7 @@ if st.session_state.stage == 11: #GCAP
         st.write("Your Synthetic Dataset:")
         st.dataframe(st.session_state.syn_data_bin, use_container_width=True, hide_index=True)
     
-    st.button(label="Go Back", on_click=set_state, args=[2])
+    st.button(label="Go Back", on_click=set_state, args=[3])
 
 if st.session_state.stage == 12: #ZCAP
     tit = 'Zero Correct Attribution Probability (ZCAP)'
@@ -1610,7 +1647,10 @@ if st.session_state.stage == 12: #ZCAP
         st.subheader("How is your score calculated?")
         st.write("Your sensitive field is whether or not you like liquorice. Lets try to infer it using your key fields.")
         st.write("Your key fields are:")
-        key_fields = ['First Name', 'Last Name', 'Height', 'Nationality', 'Favorite Icecream', 'Times Been to Italy', 'First Time London', 'Steps per Day']
+        if not st.session_state.uploaded:
+            key_fields = ['First Name', 'Last Name', 'Height', 'Nationality', 'Favorite Icecream', 'Times Been to Italy', 'First Time London', 'Steps per Day']
+        else:
+            key_fields = [col for col in st.session_state.real_data.columns if col not in st.session_state.sensitive_attributes]
         ind_vals = st.session_state.real_data[key_fields].iloc[[st.session_state.indiv_index]]
         st.dataframe(ind_vals, hide_index=True)
         syndat=st.session_state.syn_data_bin
@@ -1618,10 +1658,10 @@ if st.session_state.stage == 12: #ZCAP
         if any((ind_vals == syndat[key_fields].iloc[i]).all(axis=1).any() for i in range(len(syndat[key_fields]))):
             st.write("These rows have matching key fields in the synthetic dataset:")
             st.dataframe(matching_rows, hide_index=True)
-        if not matching_rows.empty and matching_rows['Like Liquorice'].eq(st.session_state.real_data.loc[st.session_state.indiv_index, 'Like Liquorice']).any():
+        if not matching_rows.empty and matching_rows[st.session_state.sensitive_attributes].eq(st.session_state.real_data.loc[st.session_state.indiv_index, st.session_state.sensitive_attributes]).any():
             st.write("⛔️You and your neighbour have matching sensitive fields!⛔️")
             st.write("The metric thereby accurately infered your sensitive data, and you increase the overall risk.")
-        if not matching_rows.empty and not matching_rows['Like Liquorice'].eq(st.session_state.real_data.loc[st.session_state.indiv_index, 'Like Liquorice']).any():
+        if not matching_rows.empty and not matching_rows[st.session_state.sensitive_attributes].eq(st.session_state.real_data.loc[st.session_state.indiv_index, st.session_state.sensitive_attributes]).any():
             st.write("✅You and your matches do not have matching sensitive fields.✅")
             st.write("The metric thereby can not infer your sensitive data, and you do not increase the overall risk.")
         else:
@@ -1653,7 +1693,7 @@ if st.session_state.stage == 12: #ZCAP
         st.write("Your Synthetic Dataset:")
         st.dataframe(st.session_state.syn_data_bin, use_container_width=True, hide_index=True)
         
-    st.button(label="Go Back", on_click=set_state, args=[2])
+    st.button(label="Go Back", on_click=set_state, args=[3])
 
 if st.session_state.stage == 13: #MDCR
     tit="Median Distance to Closest Record (MDCR)"
@@ -1702,10 +1742,10 @@ if st.session_state.stage == 13: #MDCR
         st.write("For your record, the equation would therefore be:")
         st.latex(r'\frac{'f'{round(st.session_state.dists_real[st.session_state.indiv_index, 1], 1)}'r'}{'f'{round(st.session_state.dists_syn[st.session_state.indiv_index, 0], 2)}'r'} = 'f'{round(st.session_state.dists_real[st.session_state.indiv_index, 1] / st.session_state.dists_syn[st.session_state.indiv_index, 0], 2)}')
         if st.session_state.dists_real[st.session_state.indiv_index, 1] > st.session_state.dists_syn[st.session_state.indiv_index, 0]:
-            st.write("⛔️You have a neighbour in the synthetic data that is closer to you than your real neighbour.⛔️")
+            st.write("⛔️You have a neighbour in the synthetic data that is closer to you than your real neighbour. *(This may not be correctly shown in the figure)*⛔️")
             st.write("The metric thereby accurately re-identified you, and you increase the overall risk.")
         else:
-            st.write("✅You have a neighbour in the real data that is closer to you than your synthetic neighbour.✅")
+            st.write("✅You have a neighbour in the real data that is closer to you than your synthetic neighbour. *(This may not be correctly shown in the figure)*✅")
             st.write("The metric thereby can not re-identify you, and you do not increase the overall risk.")
         
         st.subheader("Risk estimation of the dataset")
@@ -1763,7 +1803,7 @@ if st.session_state.stage == 13: #MDCR
         st.pyplot(scatter_plot_tsne(pd.concat([st.session_state.tsne_df_real.iloc[[st.session_state.idxs_real[len(st.session_state.tsne_df_real)-1, 1]]], st.session_state.tsne_df_real.iloc[[len(st.session_state.tsne_df_real)-1]]]),
                                                 st.session_state.tsne_df_syn.iloc[[st.session_state.idxs_syn[len(st.session_state.tsne_df_syn)-1, 1]]]))
         
-    st.button(label="Go Back", on_click=set_state, args=[2])
+    st.button(label="Go Back", on_click=set_state, args=[3])
     
 if st.session_state.stage == 14: #Hitting Rate
     tit="Hitting Rate (HitR)"
@@ -1793,11 +1833,17 @@ if st.session_state.stage == 14: #Hitting Rate
         st.write("Here are your values:")
         ind_vals = st.session_state.real_data.iloc[[st.session_state.indiv_index]]
         st.dataframe(ind_vals, hide_index=True)
-        cat_attr = ['First Name', 'Last Name', 'Height', 'Nationality', 'Favorite Icecream', 'Times Been to Italy', 'First Time London', 'Steps per Day']
+        if not st.session_state.uploaded:
+            cat_attr = ['First Name', 'Last Name', 'Height', 'Nationality', 'Favorite Icecream', 'Times Been to Italy', 'First Time London', 'Steps per Day']
+        else:
+            cat_attr = st.session_state.real_data.select_dtypes(include=['object', 'int']).columns
         if any((ind_vals[cat_attr] == st.session_state.syn_data_bin[cat_attr].iloc[i]).all(axis=1).any() for i in range(len(st.session_state.syn_data_bin[cat_attr]))):
             st.write("⛔️ You have matching synthetic individuals. ⛔️")
             st.write("These rows with matching categorical cloumns in the synthetic dataset:")
-            matching_rows = st.session_state.syn_data_bin[st.session_state.syn_data_bin.apply(lambda row: (ind_vals == row[key_fields]).all(axis=1).any(), axis=1)]
+            real_row = ind_vals[cat_attr].iloc[0]  # Get real individual's key fields as Series
+            matching_rows = st.session_state.syn_data_bin[
+                st.session_state.syn_data_bin[cat_attr].apply(lambda row: (row == real_row).all(), axis=1)
+            ]
             st.dataframe(matching_rows, hide_index=True)
         else:
             st.write("✅There are not any synthetic individuals with 'matching' values, and you are safe.✅")
@@ -1827,7 +1873,7 @@ if st.session_state.stage == 14: #Hitting Rate
         st.write("Your Synthetic Dataset:")
         st.dataframe(st.session_state.syn_data_bin, use_container_width=True, hide_index=True)
     
-    st.button(label="Go Back", on_click=set_state, args=[2])
+    st.button(label="Go Back", on_click=set_state, args=[3])
     
 if st.session_state.stage == 15: #MIR
     tit="Membership Inference Risk (MIR)"
@@ -1881,14 +1927,14 @@ if st.session_state.stage == 15: #MIR
         st.write("Scatter plot of real and synthetic data:")
         st.pyplot(scatter_plot_tsne(st.session_state.real_coords_tsne, st.session_state.syn_coords_tsne))
         
-    st.button(label="Go Back", on_click=set_state, args=[2])
+    st.button(label="Go Back", on_click=set_state, args=[3])
     
 if st.session_state.stage == 16: #NNAA
     tit="Nearest Neighbour Adversarial Accuracy (NNAA)"
     prob_overall = ''
     sol_overall = ''
     status_overall = '✅'
-    prob_u_txt = ''
+    
     if st.session_state.has_prob_syn_neigh:
         prob_overall += '<br>- Non-private data is still be produced.'
         sol_overall += '<br>- Investigate each real datapoint and its 3 nearest neighbours in real and synthetic.'
@@ -1995,14 +2041,14 @@ if st.session_state.stage == 16: #NNAA
             st.pyplot(scatter_plot(pd.concat([st.session_state.coord_real.iloc[[st.session_state.idx_real_real_gower[len(st.session_state.coord_real)-1, 1]]], st.session_state.coord_real.iloc[[len(st.session_state.coord_real)-1]]]),
                                             st.session_state.syn_coords.iloc[[st.session_state.idx_real_syn_gower[len(st.session_state.syn_coords)-1, 0]]]))
 
-    st.button(label="Go Back", on_click=set_state, args=[2])
+    st.button(label="Go Back", on_click=set_state, args=[3])
     
 if st.session_state.stage == 17: #CRP
     tit="Common Row Proportion (CRP)"
     prob_overall = ''
     sol_overall = ''
     status_overall = '✅'
-    prob_u_txt = ''
+    
     if st.session_state.has_continuous:
         prob_overall += f'<br>- Continuous attributes ({st.session_state.cont_cols}) can not be used, as the noise induced by the synthesizer renders this theoretically impossible.'
         sol_overall += '<br>- Remove all continuous attributes.'
@@ -2049,14 +2095,14 @@ if st.session_state.stage == 17: #CRP
         st.write("Your Synthetic Dataset:")
         st.dataframe(st.session_state.syn_data_bin, use_container_width=True, hide_index=True, height=150)
         
-    st.button(label="Go Back", on_click=set_state, args=[2])
+    st.button(label="Go Back", on_click=set_state, args=[3])
     
 if st.session_state.stage == 18: #NSND
     tit="Nearest Synthetic Neighbour Distance Ratio (NSND)"
     prob_overall = ''
     sol_overall = ''
     status_overall = '✅'
-    prob_u_txt = ''
+    
     if st.session_state.has_continuous:
         prob_overall += f'<br>- Distances lose expresivity and vary much for continuous attributes ({st.session_state.cont_cols}).'
         sol_overall += f'<br>- Consider removing continuous attributes ({st.session_state.cont_cols})'
@@ -2122,14 +2168,14 @@ if st.session_state.stage == 18: #NSND
         st.pyplot(scatter_plot_tsne(pd.concat([st.session_state.tsne_df_real.iloc[[st.session_state.idxs_real[len(st.session_state.tsne_df_real)-1, 1]]], st.session_state.tsne_df_real.iloc[[len(st.session_state.tsne_df_real)-1]]]),
                                                 st.session_state.tsne_df_syn.iloc[[st.session_state.idxs_syn[len(st.session_state.tsne_df_syn)-1, 1]]]))
     
-    st.button(label="Go Back", on_click=set_state, args=[2])
+    st.button(label="Go Back", on_click=set_state, args=[3])
     
 if st.session_state.stage == 19: #CVP
     tit="Close Value Probability (CVP)"
     prob_overall = ''
     sol_overall = ''
     status_overall = '✅'
-    prob_u_txt = ''
+    
     
     if st.session_state.is_large:
         prob_overall += '<br>- Distance can be misleading in high-dimensional spaces.'
@@ -2203,14 +2249,14 @@ if st.session_state.stage == 19: #CVP
         st.pyplot(scatter_plot_tsne(pd.concat([st.session_state.tsne_df_real.iloc[[st.session_state.idxs_real[len(st.session_state.tsne_df_real)-1, 1]]], st.session_state.tsne_df_real.iloc[[len(st.session_state.tsne_df_real)-1]]]),
                                                 st.session_state.tsne_df_syn.iloc[[st.session_state.idxs_syn[len(st.session_state.tsne_df_syn)-1, 1]]]))
     
-    st.button(label="Go Back", on_click=set_state, args=[2])
+    st.button(label="Go Back", on_click=set_state, args=[3])
       
 if st.session_state.stage == 20: #DVP
     tit="Distant Value Probability (DVP)"
     prob_overall = ''
     sol_overall = ''
     status_overall = '✅'
-    prob_u_txt = ''
+    
     if st.session_state.has_continuous:
         prob_overall += f'<br>- Distances lose expresivity and vary much for continuous attributes ({st.session_state.cont_cols}).'
         sol_overall += '<br>- Remove all continuous attributes.'
@@ -2263,8 +2309,6 @@ if st.session_state.stage == 20: #DVP
             st.write("There are individuals in the synthetic dataset that are close to the real individuals, and are therefore at high risk.")
         st.subheader(f"Applicability problems: {status_overall}")
         st.markdown(prob_overall, unsafe_allow_html=True)
-        st.subheader("Problems for you:")
-        st.markdown(prob_u_txt, unsafe_allow_html=True)
         st.subheader("Solutions:")
         st.markdown(sol_overall, unsafe_allow_html=True)
         st.write("**The problems that may occur:**")
@@ -2283,14 +2327,14 @@ if st.session_state.stage == 20: #DVP
         st.pyplot(scatter_plot_tsne(pd.concat([st.session_state.tsne_df_real.iloc[[st.session_state.idxs_real[len(st.session_state.tsne_df_real)-1, 1]]], st.session_state.tsne_df_real.iloc[[len(st.session_state.tsne_df_real)-1]]]),
                                                 st.session_state.tsne_df_syn.iloc[[st.session_state.idxs_syn[len(st.session_state.tsne_df_syn)-1, 1]]]))
       
-    st.button(label="Go Back", on_click=set_state, args=[2])
+    st.button(label="Go Back", on_click=set_state, args=[3])
     
 if st.session_state.stage == 21: #Authenticity
     tit="Authenticity (Auth)"
     prob_overall = ''
     sol_overall = ''
     status_overall = '✅'
-    prob_u_txt = ''
+    
     if st.session_state.is_large:
         prob_overall += '<br>- Distance can be misleading in high-dimensional spaces.'
         sol_overall += '<br>- Consider decreasing the dataset size.'
@@ -2369,14 +2413,14 @@ if st.session_state.stage == 21: #Authenticity
         st.pyplot(scatter_plot_tsne(pd.concat([st.session_state.tsne_df_real.iloc[[st.session_state.idxs_real[len(st.session_state.tsne_df_real)-1, 1]]], st.session_state.tsne_df_real.iloc[[len(st.session_state.tsne_df_real)-1]]]),
                                                 st.session_state.tsne_df_syn.iloc[[st.session_state.idxs_syn[len(st.session_state.tsne_df_syn)-1, 1]]]))
     
-    st.button(label="Go Back", on_click=set_state, args=[2])
+    st.button(label="Go Back", on_click=set_state, args=[3])
  
 if st.session_state.stage == 22: #DMLP
     tit="DetectionMLP (D-MLP)"
     prob_overall = ''
     sol_overall = ''
     status_overall = '✅'
-    prob_u_txt = ''
+    
     if st.session_state.has_prob_syn_neigh:
         prob_overall += '<br>- Non-private data is still be produced.'
         sol_overall += '<br>- Investigate each real datapoint and its 3 nearest neighbours in real and synthetic.'
@@ -2423,14 +2467,14 @@ if st.session_state.stage == 22: #DMLP
         st.write("Scatter plot of real and synthetic data:")
         st.pyplot(scatter_plot_tsne(st.session_state.real_coords_tsne, st.session_state.syn_coords_tsne))
     
-    st.button(label="Go Back", on_click=set_state, args=[2])
+    st.button(label="Go Back", on_click=set_state, args=[3])
     
 if st.session_state.stage == 23: #Identifiability
     tit="Identifiability Score (IdScore)"
     prob_overall = ''
     sol_overall = ''
     status_overall = '✅'
-    prob_u_txt = ''
+    
     if st.session_state.is_large:
         prob_overall += '<br>- Distance can be misleading in high-dimensional spaces.'
         sol_overall += '<br>- Consider decreasing the dataset size.'
@@ -2461,7 +2505,9 @@ if st.session_state.stage == 23: #Identifiability
         
         def compute_entropy(labels: np.ndarray) -> np.ndarray:
             from scipy.stats import entropy
-            value, counts = np.unique(np.round(labels), return_counts=True)
+            if np.issubdtype(labels.dtype, np.number):
+                labels = np.round(labels)
+            value, counts = np.unique(labels, return_counts=True)
             return entropy(counts)
         no, x_dim = X_gt_.shape
         W = np.zeros(
@@ -2473,7 +2519,10 @@ if st.session_state.stage == 23: #Identifiability
             W[i] = compute_entropy(X_gt_[:, i])
         X_hat = X_gt_
         X_syn_hat = X_syn_
-        eps = st.session_state.epsilon
+        if st.session_state.uploaded:
+            eps = 0.2 #Placeholder (can be changed)
+        else:
+            eps = st.session_state.epsilon
         W = np.ones_like(W)
         for i in range(x_dim):
             X_hat[:, i] = X_gt_[:, i] * 1.0 / (W[i] + eps)
@@ -2541,14 +2590,14 @@ if st.session_state.stage == 23: #Identifiability
         st.pyplot(scatter_plot_tsne(pd.concat([st.session_state.tsne_df_real.iloc[[indx_r[st.session_state.indiv_index, 1]]], st.session_state.tsne_df_real.iloc[[st.session_state.indiv_index]]]),
                                                 st.session_state.tsne_df_syn.iloc[[indx_s[st.session_state.indiv_index, 0]]]))
 
-    st.button(label="Go Back", on_click=set_state, args=[2])
+    st.button(label="Go Back", on_click=set_state, args=[3])
     
 if st.session_state.stage == 24: #DCR
     tit="Distance to Closest Record (DCR)"
     prob_overall = ''
     sol_overall = ''
     status_overall = '✅'
-    prob_u_txt = ''
+    
     if st.session_state.has_continuous:
         prob_overall += f'<br>- Distances lose expresivity and vary much for continuous attributes ({st.session_state.cont_cols}).'
         sol_overall += '<br>- Consider removing continuous attributes.'
@@ -2621,14 +2670,14 @@ if st.session_state.stage == 24: #DCR
         st.pyplot(scatter_plot(st.session_state.coord_real.iloc[[len(st.session_state.coord_real)-1]],
                             st.session_state.syn_coords.iloc[[st.session_state.idx_real_syn_gower[len(st.session_state.syn_coords)-1, 0]]]))
     
-    st.button(label="Go Back", on_click=set_state, args=[2])
+    st.button(label="Go Back", on_click=set_state, args=[3])
     
 if st.session_state.stage == 25: #NNDR
     tit="Nearest Neighbour Distance Ratio (NNDR)"
     prob_overall = ''
     sol_overall = ''
     status_overall = '✅'
-    prob_u_txt = ''
+    
     if st.session_state.has_continuous:
         prob_overall += f'<br>- Distances lose expresivity and vary much for continuous attributes ({st.session_state.cont_cols}).'
         sol_overall += '<br>- Consider removing continuous attributes.'
@@ -2702,25 +2751,17 @@ if st.session_state.stage == 25: #NNDR
         st.pyplot(scatter_plot(st.session_state.coord_real.iloc[[len(st.session_state.coord_real)-1]],
                             pd.concat([st.session_state.syn_coords.iloc[[st.session_state.idx_real_syn_gower[len(st.session_state.syn_coords)-1, 0]]], st.session_state.syn_coords.iloc[[st.session_state.idx_real_syn_gower[len(st.session_state.syn_coords)-1, 1]]]])))
     
-    st.button(label="Go Back", on_click=set_state, args=[2])
+    st.button(label="Go Back", on_click=set_state, args=[3])
     
 if st.session_state.stage == 26: #Hidden Rate
     tit="Hidden Rate"
     prob_overall = ''
     sol_overall = ''
     status_overall = '✅'
-    prob_u_txt = ''
+    
     prob_overall += '<br>- Synthetic individuals need to be generated from the real individual with same index.'
     sol_overall += '<br>- Use synthesizer that generates individuals that are based on the individual with the same index in the real data.'
     status_overall = '⛔️'
-    if status_overall == '⚠️' and status_u == '✅':
-        prob_u_txt = 'For you, the overall issues still persist. However, your score is calculated correctly.'
-    if status_overall == '✅' and status_u == '✅':
-        prob_u_txt = 'For you, the overall issues still persist. However, your score is calculated correctly.'
-    if status_overall == '⚠️' and status_u == '⚠️':
-        prob_u_txt = 'For you, the overall issues still persist, and your score calculation is influenced by this.'
-    if status_overall == '⛔️' and status_u == '⛔️':
-        prob_u_txt = 'For you, the overall issues still persist, and your score calculation is influenced by this.'
         
     st.title(tit)
     st.subheader(f"User Protected?: {st.session_state.hidr_prot}, Shareability: {st.session_state.hidr_share}, Applicability: {status_overall}")
@@ -2766,8 +2807,6 @@ if st.session_state.stage == 26: #Hidden Rate
             st.write("Some individuals are at risk, as they have matching indexes.")
         st.subheader(f"Applicability problems: {status_overall}")
         st.markdown(prob_overall, unsafe_allow_html=True)
-        st.subheader("Problems for you:")
-        st.markdown(prob_u_txt, unsafe_allow_html=True)
         st.subheader("Solutions:")
         st.markdown(sol_overall, unsafe_allow_html=True)
         
@@ -2777,7 +2816,7 @@ if st.session_state.stage == 26: #Hidden Rate
         st.write("Scatter plot of real and synthetic data mapped using PCA:")
         st.pyplot(scatter_plot(st.session_state.coord_real, st.session_state.syn_coords))
     
-    st.button(label="Go Back", on_click=set_state, args=[2])
+    st.button(label="Go Back", on_click=set_state, args=[3])
 
 if st.session_state.stage != 0:
     if st.button(label="Start Over"):
