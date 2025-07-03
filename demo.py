@@ -1,27 +1,11 @@
-import altair as alt
 import pandas as pd
 import streamlit as st
 import numpy as np
-from faker import Faker
 import random
-from synthesis.synthesizers.privbayes import PrivBayes
 from sklearn.preprocessing import LabelEncoder
-from Metrics import All_synthcity
-from Metrics import AttributeInference1 as AIR
-from Metrics import CGeneralizedCAP as GCAP
-from Metrics import CZeroCAP as CZCAP
-from Metrics import NNAA
-from Metrics import MemInf as MIR
-from Metrics import Hitting_rate
-from Metrics import MDCR
 from saiph.projection import fit_transform
 from saiph.projection import transform
 import matplotlib.pyplot as plt
-from DataSynthesizer1.DataDescriber import DataDescriber
-from DataSynthesizer1.DataGenerator import DataGenerator
-from datetime import datetime
-import math
-import os
 from sklearn.neighbors import NearestNeighbors
 from sklearn.manifold import TSNE
 from sklearn.preprocessing import OrdinalEncoder
@@ -102,11 +86,13 @@ def get_uploaded_data():
     st.session_state.tsne_df_real = pd.DataFrame(st.session_state.real_coords_tsne)
     st.session_state.tsne_df_syn = pd.DataFrame(st.session_state.syn_coords_tsne)
 
-    if list(st.session_state.real_data.columns) == ['Administrative','Administrative_Duration','Informational','Informational_Duration','ProductRelated','ProductRelated_Duration','BounceRates','ExitRates','PageValues','SpecialDay','Month','OperatingSystems','Browser','Region','TrafficType','VisitorType','Weekend','Revenue']:
-        st.session_state.metric_results_bin = pd.read_csv(f'metric_results/tabsyn_metric_results.csv', index_col=False)
+    if st.session_state.demo_data == 'Tabsyn':
+        st.session_state.metric_results_bin = round(pd.read_csv(f'metric_results/{st.session_state.demo_data}_metric_results.csv', index_col=False), 2)
+    elif st.session_state.demo_data in ['privbayes(e=0.02)', 'privbayes(e=0.05)', 'privbayes(e=0.1)', 'privbayes(e=0.2)', 'privbayes(e=0.5)', 'privbayes(e=1.0)', 'privbayes(e=2.5)', 'privbayes(e=5.0)']:
+        st.session_state.metric_results_bin = round(pd.read_csv(f'metric_results/{st.session_state.demo_data}_metric_results.csv', index_col=False), 2)
     else:
-        st.session_state.metric_results_bin = get_metric_results(st.session_state.real_data, st.session_state.syn_data_bin, st.session_state.real_labels, st.session_state.syn_labels, st.session_state.sensitive_attributes)
-    
+        st.session_state.metric_results_bin = round(get_metric_results(st.session_state.real_data, st.session_state.syn_data_bin, st.session_state.real_labels, st.session_state.syn_labels, st.session_state.sensitive_attributes), 2)
+
 def scatter_plot_real(coord_real):
     your_x = coord_real['Dim. 1'].iloc[st.session_state.indiv_index]
     your_y = coord_real['Dim. 2'].iloc[st.session_state.indiv_index]
@@ -570,7 +556,7 @@ def idS_no_prot():
     X_hat = X_gt_
     X_syn_hat = X_syn_
     if st.session_state.uploaded:
-        eps = 0.2 #Placeholder (can be changed)
+        eps = 0.1 #Placeholder (can be changed)
     else:
         eps = st.session_state.epsilon
     W = np.ones_like(W)
@@ -996,12 +982,14 @@ if st.session_state.stage == 1:#User input
                 st.error("The synthetic data must have the same columns as the real data.")
             st.write("*Synthetic data uploaded successfully!*")
             if list(st.session_state.real_data.columns) == ['Administrative','Administrative_Duration','Informational','Informational_Duration','ProductRelated','ProductRelated_Duration','BounceRates','ExitRates','PageValues','SpecialDay','Month','OperatingSystems','Browser','Region','TrafficType','VisitorType','Weekend','Revenue']:
-                st.write("*You are using the tabsyn dataset in which the results are pre-computed. Therefore, the sensitive attribute is locked on Revenue.*")
+                st.write("*You are using the Shoppers dataset example in which the results are pre-computed for the demonstration. Therefore, the sensitive attribute is locked on Revenue.*")
                 st.session_state.sensitive_attributes = st.selectbox("Select sensitive attribute", st.session_state.real_data.columns, index=st.session_state.real_data.columns.get_loc('Revenue'), disabled=True)
             else:
                 st.write("**Which attribute is sensitive?**")
                 st.session_state.sensitive_attributes = st.selectbox("Select sensitive attribute", st.session_state.real_data.columns)
-        
+            used_demo_data = st.checkbox("**Did you use one of the demonstration synthesizers?**")
+            if used_demo_data:
+                st.session_state.demo_data = st.selectbox("Which one did you use?", ["tabsyn", "privbayes(e=0.02)", "privbayes(e=0.05)", "privbayes(e=0.1)", "privbayes(e=0.2)", "privbayes(e=0.5)", "privbayes(e=1.0)", "privbayes(e=2.5)", "privbayes(e=5.0)"])
 
 
     if not st.session_state.uploaded:
@@ -2520,7 +2508,7 @@ if st.session_state.stage == 23: #Identifiability
         X_hat = X_gt_
         X_syn_hat = X_syn_
         if st.session_state.uploaded:
-            eps = 0.2 #Placeholder (can be changed)
+            eps = 0.1 #Placeholder (can be changed)
         else:
             eps = st.session_state.epsilon
         W = np.ones_like(W)
