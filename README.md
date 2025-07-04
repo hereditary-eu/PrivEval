@@ -49,6 +49,9 @@ This means that PrivEval is a first step to bridge the gap between privacy exper
 | Nearest Synthetic Neighbor Distance | SND measures the risk of re-identification by assessing how easily an attacker, using the synthetic data, can infer the individual from which it was generated through a distance measure. The score is calculated as the mean min-max reduced distance to the nearest synthetic neighbour.                                      |
 | Nearest Neighbor Distance Ratio     | NNDR measures the risk of re-identification by assessing how easily an attacker, using the synthetic data, can infer the individual from which it was generated. This is measure as the distance ratio between real and synthetic data.                                                                                          |
 
+## Requirements
+The input datasets must be single table CSV files with no individuals repeating in the dataset for correct metric calculation.
+
 ## Other information
 
 A python notebook is available to generate the real and synthetic dataset using the file gen_dataset.ipynb.
