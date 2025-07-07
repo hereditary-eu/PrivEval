@@ -987,7 +987,7 @@ if st.session_state.stage == 1:#User input
             else:
                 st.write("**Which attribute is sensitive?**")
                 st.session_state.sensitive_attributes = st.selectbox("Select sensitive attribute", st.session_state.real_data.columns)
-            used_demo_data = st.checkbox("**Did you use one of the demonstration synthesizers?**")
+            used_demo_data = st.checkbox("**Did you use one of the demonstration synthesizers?**", value=True)
             if used_demo_data:
                 st.session_state.demo_data = st.selectbox("Which one did you use?", ["tabsyn", "privbayes(e=0.02)", "privbayes(e=0.05)", "privbayes(e=0.1)", "privbayes(e=0.2)", "privbayes(e=0.5)", "privbayes(e=1.0)", "privbayes(e=2.5)", "privbayes(e=5.0)"])
 
