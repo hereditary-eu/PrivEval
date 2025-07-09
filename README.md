@@ -57,5 +57,5 @@ The input datasets must not contain missing values
 
 A python notebook is available to generate the real and synthetic dataset using the file gen_dataset.ipynb.
 
-To ensure correct calculation of privacy risk for your data, sensitive_attributes.txt is a text file with sensitive attributes seperated by newline. For other metrics, we refer to their individual implementations in the Metrics folder to change e.g. thresholds and iterations.
+For some metrics, we refer to their individual implementations in the Metrics folder to change e.g. thresholds and iterations.
 
