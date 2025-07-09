@@ -115,3 +115,40 @@ def get_metric_results(real_data, syn_data, real_labels, syn_labels, sensitive_a
     results = pd.DataFrame({'Metric':metric_list, 'Result':priv_results})
     
     return results
+
+
+
+if __name__ == "__main__":
+    from sklearn.preprocessing import LabelEncoder
+    import pandas as pd
+
+    df = pd.read_csv("Data/ALS_baseline_fixed_for_DataSynthesizer_bool.csv", index_col=False)
+    syn_df = pd.read_csv("Data/ALS_imputed_DataSynthesizer_2_bool.csv", index_col=False)
+    print(df.head())
+    print(syn_df.head())
+
+    all_data = pd.concat([df, syn_df], ignore_index=True)
+
+    cat_cols = all_data.select_dtypes(include=['object', 'bool']).columns
+
+    # Initialize a dictionary to hold encoded data
+    encoded_data = {}
+    for col in cat_cols:
+        if all_data[col].dtype == 'bool':
+            encoded_data[col] = all_data[col].astype(int)
+        else:
+            le = LabelEncoder()
+            encoded_data[col] = le.fit_transform(all_data[col].astype(str))
+
+    num_cols = all_data.select_dtypes(exclude=['object', 'bool']).columns
+    for col in num_cols:
+        encoded_data[col] = all_data[col]
+
+    all_labels = pd.DataFrame(encoded_data)
+    real_len = len(df)
+    real_labels = all_labels[:real_len]
+    syn_labels = all_labels[real_len:]
+
+    metric_results = get_metric_results(df, syn_df, real_labels, syn_labels, sensitive_attributes=['Diabetes'])
+    print("Metric Results:")
+    print(metric_results)

@@ -46,7 +46,22 @@ def get_data(epsilon):
     st.session_state.tsne_df_real = pd.DataFrame(st.session_state.real_coords_tsne)
     st.session_state.tsne_df_syn = pd.DataFrame(st.session_state.syn_coords_tsne)
 
-def get_uploaded_data():
+def get_uploaded_data():     
+    if st.session_state.real_data.isnull().any().any():
+        st.error("Real data contains null values. Please clean your data first.")
+        st.write("Do you want to fill null values with 0?")
+        if st.button("Yes"):
+            st.session_state.real_data = st.session_state.real_data.fillna(0)
+        else:
+            st.stop()
+
+    if st.session_state.syn_data_bin.isnull().any().any():
+        st.error("Synthetic data contains null values. Please clean your data first.")
+        st.write("Do you want to fill null values with 0?")
+        if st.button("Yes"):
+            st.session_state.syn_data_bin = st.session_state.syn_data_bin.fillna(0)
+        else:
+            st.stop()
     st.session_state.coord_real, model_pca = fit_transform(st.session_state.real_data, nf=2)
     st.session_state.syn_coords = transform(st.session_state.syn_data_bin, model_pca)
     
@@ -91,7 +106,7 @@ def get_uploaded_data():
     elif st.session_state.demo_data in ['privbayes(e=0.02)', 'privbayes(e=0.05)', 'privbayes(e=0.1)', 'privbayes(e=0.2)', 'privbayes(e=0.5)', 'privbayes(e=1.0)', 'privbayes(e=2.5)', 'privbayes(e=5.0)']:
         st.session_state.metric_results_bin = round(pd.read_csv(f'metric_results/{st.session_state.demo_data}_metric_results.csv', index_col=False), 2)
     else:
-        st.session_state.metric_results_bin = round(get_metric_results(st.session_state.real_data, st.session_state.syn_data_bin, st.session_state.real_labels, st.session_state.syn_labels, st.session_state.sensitive_attributes), 2)
+        st.session_state.metric_results_bin = round(get_metric_results(st.session_state.real_data, st.session_state.syn_data_bin, st.session_state.real_labels, st.session_state.syn_labels, [str(st.session_state.sensitive_attributes)]), 2)
 
 def scatter_plot_real(coord_real):
     your_x = coord_real['Dim. 1'].iloc[st.session_state.indiv_index]
@@ -987,6 +1002,7 @@ if st.session_state.stage == 1:#User input
             else:
                 st.write("**Which attribute is sensitive?**")
                 st.session_state.sensitive_attributes = st.selectbox("Select sensitive attribute", st.session_state.real_data.columns)
+                
             used_demo_data = st.checkbox("**Did you use one of the demonstration synthesizers?**", value=True)
             if used_demo_data:
                 st.session_state.demo_data = st.selectbox("Which one did you use?", ["tabsyn", "privbayes(e=0.02)", "privbayes(e=0.05)", "privbayes(e=0.1)", "privbayes(e=0.2)", "privbayes(e=0.5)", "privbayes(e=1.0)", "privbayes(e=2.5)", "privbayes(e=5.0)"])
