@@ -51,6 +51,7 @@ This means that PrivEval is a first step to bridge the gap between privacy exper
 
 ## Requirements
 The input datasets must be single table CSV files with no individuals repeating in the dataset for correct metric calculation.
+The input datasets must not contain missing values
 
 ## Other information
 
