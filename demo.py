@@ -664,9 +664,10 @@ def metric_applicability(metric_results):
     if metric_results.loc[metric_results['Metric']=='Hitting Rate', 'Result'].iloc[0] >= 0.00001:
         shareable_column.loc[shareable_column['Metric']=='Hitting Rate', 'Shareable?'] = '⛔️'
         st.session_state.hitr_share = '⛔️'
-    if metric_results.loc[metric_results['Metric']=='Membership Inference Risk', 'Result'].iloc[0] > 0.5:
-        shareable_column.loc[shareable_column['Metric']=='Membership Inference Risk', 'Shareable?'] = '⛔️'
-        st.session_state.mir_share = '⛔️'
+    # Membership Inference Risk metric has been commented out
+    # if metric_results.loc[metric_results['Metric']=='Membership Inference Risk', 'Result'].iloc[0] > 0.5:
+    #     shareable_column.loc[shareable_column['Metric']=='Membership Inference Risk', 'Shareable?'] = '⛔️'
+    #     st.session_state.mir_share = '⛔️'
     if metric_results.loc[metric_results['Metric']=='Nearest Neighbour Adversarial Accuracy', 'Result'].iloc[0] > 0.1:
         shareable_column.loc[shareable_column['Metric']=='Nearest Neighbour Adversarial Accuracy', 'Shareable?'] = '⚠️'
         st.session_state.nnaa_share = '⚠️'
@@ -735,9 +736,10 @@ def metric_applicability(metric_results):
     if hitr_no_prot():
         user_protected_column.loc[user_protected_column['Metric']=='Hitting Rate', 'User Protected?'] = '⛔️'
         st.session_state.hitr_prot = '⛔️'
-    if metric_results.loc[metric_results['Metric']=='Membership Inference Risk', 'Result'].iloc[0] <= 1:
-        user_protected_column.loc[user_protected_column['Metric']=='Membership Inference Risk', 'User Protected?'] = '⚠️'
-        st.session_state.mir_prot = '⚠️'
+    # Membership Inference Risk metric has been commented out
+    # if metric_results.loc[metric_results['Metric']=='Membership Inference Risk', 'Result'].iloc[0] <= 1:
+    #     user_protected_column.loc[user_protected_column['Metric']=='Membership Inference Risk', 'User Protected?'] = '⚠️'
+    #     st.session_state.mir_prot = '⚠️'
     if nnaa_no_prot():
         user_protected_column.loc[user_protected_column['Metric']=='Nearest Neighbour Adversarial Accuracy', 'User Protected?'] = '️️⛔️'
         st.session_state.nnaa_prot = '⛔️'
@@ -848,10 +850,11 @@ def metric_applicability(metric_results):
         mdcr_sol += '<br>- Invetigate the distances between individual data points.'
         applicability_column.loc[applicability_column['Metric']=='Median Distance to Closest Record', 'App.'] = '⛔️'
         applicability_u_column.loc[applicability_u_column['Metric']=='Median Distance to Closest Record', 'User App.'] = '⚠️'
-        mir_prob += '<br>- Classification model is being cheated, and a risk persists.'
-        mir_sol += '<br>- Investigate each real datapoint and its 3 nearest neighbours in real and synthetic.'
-        applicability_column.loc[applicability_column['Metric']=='Membership Inference Risk', 'App.'] = '⛔️'
-        applicability_u_column.loc[applicability_u_column['Metric']=='Membership Inference Risk', 'User App.'] = '⚠️'
+        # Membership Inference Risk metric has been commented out
+        # mir_prob += '<br>- Classification model is being cheated, and a risk persists.'
+        # mir_sol += '<br>- Investigate each real datapoint and its 3 nearest neighbours in real and synthetic.'
+        # applicability_column.loc[applicability_column['Metric']=='Membership Inference Risk', 'App.'] = '⛔️'
+        # applicability_u_column.loc[applicability_u_column['Metric']=='Membership Inference Risk', 'User App.'] = '⚠️'
         nnaa_prob += '<br>- Non-private data is still be produced.'
         nnaa_sol += '<br>- Investigate each real datapoint and its 3 nearest neighbours in real and synthetic.'
         applicability_column.loc[applicability_column['Metric']=='Nearest Neighbour Adversarial Accuracy', 'App.'] = '⛔️'
@@ -880,10 +883,11 @@ def metric_applicability(metric_results):
         applicability_column.loc[applicability_column['Metric']=='Nearest Neighbour Distance Ratio', 'App.'] = '⛔️'
         applicability_u_column.loc[applicability_u_column['Metric']=='Nearest Neighbour Distance Ratio', 'User App.'] = '⚠️'
     
-    mir_prob += '<br>- Assumes that the adversary has very much knowledge about the real data.'
-    mir_sol += '<br>- Try multiple different subset as a training set to get a better evaluation.'
-    applicability_column.loc[applicability_column['Metric']=='Membership Inference Risk', 'App.'] = '⚠️'
-    applicability_u_column.loc[applicability_u_column['Metric']=='Membership Inference Risk', 'User App.'] = '⚠️'
+    # Membership Inference Risk metric has been commented out
+    # mir_prob += '<br>- Assumes that the adversary has very much knowledge about the real data.'
+    # mir_sol += '<br>- Try multiple different subset as a training set to get a better evaluation.'
+    # applicability_column.loc[applicability_column['Metric']=='Membership Inference Risk', 'App.'] = '⚠️'
+    # applicability_u_column.loc[applicability_u_column['Metric']=='Membership Inference Risk', 'User App.'] = '⚠️'
     cvp_prob += '<br>- Finding a "correct" threshold is a very difficult task.'
     cvp_sol += '<br>- Establish a threshold matching distances in datasets.'
     applicability_column.loc[applicability_column['Metric']=='Close Value Probability', 'App.'] = '⛔️'
@@ -905,7 +909,8 @@ def metric_applicability(metric_results):
     problem_column.loc[problem_column['Metric']=='GeneralizedCAP', 'Problem'] = gcap_prob
     problem_column.loc[problem_column['Metric']=='Median Distance to Closest Record', 'Problem'] = mdcr_prob
     problem_column.loc[problem_column['Metric']=='Hitting Rate', 'Problem'] = hitr_prob
-    problem_column.loc[problem_column['Metric']=='Membership Inference Risk', 'Problem'] = mir_prob
+    # Membership Inference Risk metric has been commented out
+    # problem_column.loc[problem_column['Metric']=='Membership Inference Risk', 'Problem'] = mir_prob
     problem_column.loc[problem_column['Metric']=='Nearest Neighbour Adversarial Accuracy', 'Problem'] = nnaa_prob
     problem_column.loc[problem_column['Metric']=='Common Row Proportion', 'Problem'] = crp_prob
     problem_column.loc[problem_column['Metric']=='Nearest Synthetic Neighbour Distance', 'Problem'] = nsnd_prob
@@ -923,7 +928,8 @@ def metric_applicability(metric_results):
     solution_column.loc[solution_column['Metric']=='GeneralizedCAP', 'Possible Solution'] = gcap_sol
     solution_column.loc[solution_column['Metric']=='Median Distance to Closest Record', 'Possible Solution'] = mdcr_sol
     solution_column.loc[solution_column['Metric']=='Hitting Rate', 'Possible Solution'] = hitr_sol
-    solution_column.loc[solution_column['Metric']=='Membership Inference Risk', 'Possible Solution'] = mir_sol
+    # Membership Inference Risk metric has been commented out
+    # solution_column.loc[solution_column['Metric']=='Membership Inference Risk', 'Possible Solution'] = mir_sol
     solution_column.loc[solution_column['Metric']=='Nearest Neighbour Adversarial Accuracy', 'Possible Solution'] = nnaa_sol
     solution_column.loc[solution_column['Metric']=='Common Row Proportion', 'Possible Solution'] = crp_sol
     solution_column.loc[solution_column['Metric']=='Nearest Synthetic Neighbour Distance', 'Possible Solution'] = nsnd_sol

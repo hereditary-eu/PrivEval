@@ -1,15 +1,26 @@
+# Core ML and Data Science
 streamlit
 pandas
-tqdm
-faiss-cpu
-saiph
-synthcity
-sdv
-synthetic-data-generation
-syntheval
-DataSynthesizer
-numpy==1.24.3
-scipy==1.10.0
-networkx==2.6.3
-cupy==11.6.0
-mpmath==1.3.0
+numpy==1.24.3  # Specific version for compatibility
+scikit-learn
+scipy==1.10.0  # Specific version
+matplotlib
+lightgbm                # For membership inference attack classifier
+
+# Specialized Libraries
+saiph                    # For projection/dimensionality reduction
+faiss-cpu               # For nearest neighbor search
+sdmetrics               # For privacy metrics (includes copulas)
+#sdv?                   # For privacy metrics (optional, can be used instead of sdmetrics)
+
+# Privacy/Synthetic Data Libraries
+synthcity               # Privacy/Synthetic Data Library
+syntheval               # Evaluation metrics for synthetic data
+DataSynthesizer         # Synthetic data generation
+faker                   # For generating fake data
+synthetic-data-generation  # For synthetic data generation
+
+# Other Required
+tqdm                    # Progress bars
+networkx==2.6.3         # Graph library (specific version)
+mpmath==1.3.0           # Mathematical functions

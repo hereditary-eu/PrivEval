@@ -26,7 +26,11 @@ def get_metric_results(real_data, syn_data, real_labels, syn_labels, sensitive_a
                     'privacy': ['identifiability_score'],
                 }
     
-    #mir = MIR.calculate_metric(args=None, _real_data=real_data, _synthetic=syn_data)
+    try:
+        mir = MIR.calculate_metric(args=None, _real_data=real_data, _synthetic=syn_data)
+    except Exception as e:
+        print(f"Error in MIR calculation: {e}")
+        mir = 0.0
 
     try:
         synthcity_results = All_synthcity.calculate_metric(args = None, _real_data=real_data, _synthetic=real_data, _metrics=metrics)
@@ -95,7 +99,7 @@ def get_metric_results(real_data, syn_data, real_labels, syn_labels, sensitive_a
         
     # Convert results to a list with 2 decimal places
     priv_results = np.around([air, gcap, zcap, 
-                            mdcr, hitR, #mir, 
+                            mdcr, hitR, mir, 
                             nnaa, crp, nsnd, 
                             cvp, dvp, auth, 
                             mlp, id_score, 
@@ -104,7 +108,7 @@ def get_metric_results(real_data, syn_data, real_labels, syn_labels, sensitive_a
     
     metric_list = ["Attribute Inference Risk", "GeneralizedCAP", "ZeroCAP", 
                    "Median Distance to Closest Record", "Hitting Rate",
-                   #"Membership Inference Risk", 
+                   "Membership Inference Risk", 
                    "Nearest Neighbour Adversarial Accuracy",
                    "Common Row Proportion", "Nearest Synthetic Neighbour Distance",
                    "Close Value Probability", "Distant Value Probability",
