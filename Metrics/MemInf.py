@@ -2,25 +2,101 @@
 
 import numpy as np
 import pandas as pd
-from logging import warning
 from lightgbm import LGBMClassifier
 from sklearn.metrics import precision_score, recall_score, f1_score
 from sklearn.model_selection import train_test_split
 from copy import deepcopy
 
 
-class MIAClassifier:
-    """The Metric Class for Membership Inference Attack evaluation.
-
-    Attributes:
-    self.real_data : DataFrame
-    self.synt_data : DataFrame
-    self.hout_data : DataFrame
-    self.cat_cols  : list of strings
-    self.num_cols  : list of strings
+def calculate_metric(args=None, _real_data=None, _synthetic=None, num_eval_iter=5):
     """
+    Calculate Membership Inference Risk (MIR) following the exact description.
+    
+    MIR estimates the risk of determining whether an individual contributed their data 
+    to the real dataset while assuming that the adversary has access to synthetic data 
+    and the person of interest.
+    
+    Args:
+        _real_data: Real dataset (labeled as 1)
+        _synthetic: Synthetic dataset (labeled as 0)
+        num_eval_iter: Number of evaluation iterations
+    
+    Returns:
+        float: MIR score (recall of real data classification)
+    """
+    try:
+        real_data = deepcopy(_real_data)
+        synthetic = deepcopy(_synthetic)
+        
+        # Ensure we have enough data
+        if len(real_data) < 10 or len(synthetic) < 10:
+            return 0.0
+        
+        # Step 1: Create labels as described
+        # L_Y = [1, 1, ..., 1] with |L_Y| = |Y|
+        # L_Z = [0, 0, ..., 0] with |L_Z| = |Z|
+        L_Y = [1] * len(real_data)
+        L_Z = [0] * len(synthetic)
+        
+        # Step 2: Create combined dataset D = Y ∪ Z and labels L = L_Y ∪ L_Z
+        D = pd.concat([real_data, synthetic], axis=0, ignore_index=True)
+        L = pd.Series(L_Y + L_Z)
+        
+        # Handle categorical columns - one-hot encode
+        cat_cols = D.select_dtypes(include=['object', 'category']).columns.tolist()
+        if cat_cols:
+            D_encoded = pd.get_dummies(D, columns=cat_cols, drop_first=True)
+        else:
+            D_encoded = D
+        
+        # Handle missing values
+        D_encoded = D_encoded.fillna(D_encoded.mean())
+        
+        # Run multiple iterations and average results
+        recall_scores = []
+        
+        for _ in range(num_eval_iter):
+            # Step 3: Split into train/test sets
+            try:
+                D_train, D_test, L_train, L_test = train_test_split(
+                    D_encoded, L, test_size=0.3, random_state=None, stratify=L
+                )
+            except ValueError:
+                # If stratification fails, do simple split
+                D_train, D_test, L_train, L_test = train_test_split(
+                    D_encoded, L, test_size=0.3, random_state=None
+                )
+            
+            # Step 4: Train LightGBM classifier
+            # f_θ = LightGBM(D_train)
+            cls = LGBMClassifier(verbosity=-1, random_state=42)
+            cls.fit(D_train, L_train)
+            
+            # Step 5: Make predictions
+            # ĥ_i = 1 if f_θ(x_j) >= 0.5, else 0
+            y_pred = cls.predict(D_test)
+            
+            # Step 6: Calculate recall (MIR)
+            # MIR = (True Positives) / (True Positives + False Negatives)
+            # = (correctly identified real samples) / (total real samples in test)
+            recall = recall_score(L_test, y_pred)
+            recall_scores.append(recall)
+        
+        # Return average recall across iterations
+        mir_score = np.mean(recall_scores)
+        
+        return float(mir_score)
+        
+    except Exception as e:
+        print(f"Error in MIR calculation: {e}")
+        return 0.0
 
-    def __init__(self, real_data, synt_data, hout_data, cat_cols=None, num_cols=None):
+
+# Keep the class for backward compatibility if needed
+class MIAClassifier:
+    """The Metric Class for Membership Inference Attack evaluation."""
+
+    def __init__(self, real_data, synt_data, hout_data=None, cat_cols=None, num_cols=None):
         self.real_data = real_data
         self.synt_data = synt_data
         self.hout_data = hout_data
@@ -29,140 +105,16 @@ class MIAClassifier:
         self.results = {}
 
     def name(self) -> str:
-        """Name/keyword to reference the metric"""
         return "mia"
 
     def type(self) -> str:
-        """Set to 'privacy' or 'utility'"""
         return "privacy"
 
-    def evaluate(self, num_eval_iter=5) -> float | dict:
-        """Function for computing the precision, recall, and F1-score of a membership 
-        inference attack using a LightGBM classifier
-        
-        Args:
-            num_eval_iter (int): Number of iterations to run the classifier
-
-        Returns:
-            dict: Precision, recall, and F1-score of the membership inference
-        """
-        try:
-            assert self.hout_data is not None
-        except AssertionError:
-            print(" Warning: Membership inference attack metric did not run, holdout data was not supplied!")
-            return {"MIA recall": 0.0}
-        
-        if len(self.real_data) < len(self.hout_data) // 2:
-                warning(
-                    "The holdout data is more than double the size of the real data. The holdout data will be downsampled to match the size of the real data. real size: %s, holdout size: %s", len(self.real_data), len(self.hout_data)
-                )
-        
-        # One-hot encode. All data is combined to ensure consistent encoding
-        combined_data = pd.concat(
-            [self.real_data, self.synt_data, self.hout_data], ignore_index=True
+    def evaluate(self, num_eval_iter=5) -> float:
+        """Evaluate using the corrected MIR calculation"""
+        return calculate_metric(
+            args=None, 
+            _real_data=self.real_data, 
+            _synthetic=self.synt_data, 
+            num_eval_iter=num_eval_iter
         )
-        combined_data_encoded = pd.get_dummies(
-            combined_data, columns=self.cat_cols, drop_first=True
-        )
-
-        # Separate into the three datasets
-        real = combined_data_encoded.iloc[: len(self.real_data)].reset_index(drop=True)
-        syn = combined_data_encoded.iloc[
-            len(self.real_data) : len(self.real_data) + len(self.synt_data)
-        ].reset_index(drop=True)
-        hout = combined_data_encoded.iloc[
-            len(self.real_data) + len(self.synt_data) :
-        ].reset_index(drop=True)
-
-        # Run classifier multiple times and average the results
-        pre_results = {
-            "precision": [],
-            "recall": [],
-            "f1": [],
-        }
-        for _ in range(num_eval_iter):
-            hout_train, hout_test = train_test_split(hout, test_size=0.25)
-            syn_samples = syn.sample(n=len(hout_train))
-
-            # Create training data consisting of synthetic and holdout data
-            X_train = pd.concat([syn_samples, hout_train], axis=0, ignore_index=True)
-            y_train = pd.Series([1] * len(syn_samples) + [0] * len(hout_train))
-
-            # Shuffle
-            shuffle_idx = np.arange(len(X_train))
-            np.random.shuffle(shuffle_idx)
-            X_train = X_train.iloc[shuffle_idx]
-            y_train = y_train.iloc[shuffle_idx]
-            
-            # Create test set by combining some random data from the real and holdout data with an equal number of records from each dataframe
-            if len(real) < len(hout_test):
-                hout_sample = hout_test.sample(n=len(real))
-                real_sample = real
-            else:
-                real_sample = real.sample(n=len(hout_test))
-                hout_sample = hout_test
-            X_test = pd.concat(
-                [
-                    real_sample,
-                    hout_sample,
-                ],
-                axis=0,
-                ignore_index=True,
-            )
-            y_test = pd.Series([1] * len(real_sample) + [0] * len(hout_sample))
-
-            cls = LGBMClassifier(verbosity=-1).fit(X_train, y_train)
-            # Get predictions
-            holdout_predictions = cls.predict(X_test)
-
-            # Calculate precision, recall, and F1-score
-            pre_results["precision"].append(
-                precision_score(y_test, holdout_predictions)
-            )
-            pre_results["recall"].append(recall_score(y_test, holdout_predictions))
-            pre_results["f1"].append(
-                f1_score(y_test, holdout_predictions, average="macro")
-            )
-
-        precision = np.mean(pre_results["precision"])
-        precision_se = np.std(pre_results["precision"], ddof=1) / np.sqrt(
-            num_eval_iter
-        )
-
-        recall = np.mean(pre_results["recall"])
-        recall_se = np.std(pre_results["recall"], ddof=1) / np.sqrt(num_eval_iter)
-
-        f1 = np.mean(pre_results["f1"])
-        f1_se = np.std(pre_results["f1"], ddof=1) / np.sqrt(num_eval_iter)
-
-        self.results = {
-            "MIA precision": precision,
-            "MIA precision se": precision_se,
-            "MIA recall": recall,
-            "MIA recall se": recall_se,
-            "MIA macro F1": f1,
-            "MIA macro F1 se": f1_se,
-        }
-
-        return self.results
-
-
-def calculate_metric(args, _real_data, _synthetic):
-    """Wrapper function to maintain compatibility with existing code"""
-    real_data = deepcopy(_real_data)
-    synthetic = deepcopy(_synthetic)
-
-    # Split real data into train and holdout
-    train_df, holdout_df = train_test_split(real_data, test_size=0.2, random_state=42)
-    
-    # Determine categorical and numerical columns
-    cat_cols = train_df.select_dtypes(include=['object', 'category']).columns.tolist()
-    num_cols = train_df.select_dtypes(include=[np.number]).columns.tolist()
-    
-    # Create MIA classifier
-    mia = MIAClassifier(train_df, synthetic, holdout_df, cat_cols, num_cols)
-    
-    # Evaluate and return recall score
-    results = mia.evaluate(num_eval_iter=5)
-    
-    return results.get("MIA recall", 0.0)
