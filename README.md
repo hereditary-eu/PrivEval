@@ -24,7 +24,7 @@ This means that PrivEval is a first step to bridge the gap between privacy exper
 
 ## Tables of available privacy metrics for each attack
 
-The mathematical definitions of the metrics can be found in the [technical report](https://doi.org/10.48550/arXiv.2507.11324)
+The definitions of each privacy metric can be found in the [Technical Report](https://doi.org/10.48550/arXiv.2507.11324). For less elaborate definitions of the privacy metrics, we refer to this table:
 
 ### Reconstruction risk
 | **Metric**               | **Description**                                                                                                                                                                                                                                 |
