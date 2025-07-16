@@ -1,8 +1,9 @@
-<p align="center">
 # PrivEval: a tool for interactive evaluation of privacy metrics in synthetic data generation
 
+<p align="center">
 <img center=True width="904" height="246" alt="PrivEval_model" src="https://github.com/user-attachments/assets/dabde83a-634a-4e70-8d16-fede51e268c6" />
 </p>
+
 PrivEval, a tool for assisting users in evaluating the privacy properties of a synthetic dataset.
 Here, the user can explore how privacy is estimated through privacy metrics as well as their applicability for specific scenarios and the implications thereof.
 This means that PrivEval is a first step to bridge the gap between privacy experts and the general public for making privacy estimation more transparent.
@@ -22,6 +23,8 @@ This means that PrivEval is a first step to bridge the gap between privacy exper
    ```
 
 ## Tables of available privacy metrics for each attack
+
+The mathematical definitions of the metrics can be found in the [technical report](https://doi.org/10.48550/arXiv.2507.11324)
 
 ### Reconstruction risk
 | **Metric**               | **Description**                                                                                                                                                                                                                                 |
