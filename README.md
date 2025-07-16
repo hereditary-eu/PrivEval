@@ -1,6 +1,6 @@
 # PrivEval: a tool for interactive evaluation of privacy metrics in synthetic data generation
 
-![alt text](https://github.com/hereditary-eu/PrivEval/tree/main/images/PrivEval_model.pdf)
+[PrivEval_model.pdf](https://github.com/user-attachments/files/21249096/PrivEval_model.pdf)
 
 PrivEval, a tool for assisting users in evaluating the privacy properties of a synthetic dataset.
 Here, the user can explore how privacy is estimated through privacy metrics as well as their applicability for specific scenarios and the implications thereof.
