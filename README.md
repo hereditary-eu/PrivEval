@@ -1,5 +1,6 @@
-# PrivEval: a tool for interactive evaluation of privacy metrics in synthetic data generation
 <p align="center">
+# PrivEval: a tool for interactive evaluation of privacy metrics in synthetic data generation
+
 <img center=True width="904" height="246" alt="PrivEval_model" src="https://github.com/user-attachments/assets/dabde83a-634a-4e70-8d16-fede51e268c6" />
 </p>
 PrivEval, a tool for assisting users in evaluating the privacy properties of a synthetic dataset.
