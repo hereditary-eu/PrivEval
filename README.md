@@ -65,6 +65,8 @@ A python notebook is available to generate the real and synthetic dataset using 
 
 For some metrics, we refer to their individual implementations in the Metrics folder to change e.g. thresholds and iterations.
 
+
+## Citing
 If you use this code, please cite the associated paper:
 ```
 
