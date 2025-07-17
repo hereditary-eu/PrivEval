@@ -68,6 +68,19 @@ For some metrics, we refer to their individual implementations in the Metrics fo
 
 ## Citing
 If you use this code, please cite the associated paper:
+PrivEval:
 ```
 
+```
+Technical Report:
+```
+@misc{trudslev2025reviewprivacymetricsprivacypreserving,
+      title={A Review of Privacy Metrics for Privacy-Preserving Synthetic Data Generation}, 
+      author={Frederik Marinus Trudslev and Matteo Lissandrini and Juan Manuel Rodriguez and Martin Bøgsted and Daniele Dell'Aglio},
+      year={2025},
+      eprint={2507.11324},
+      archivePrefix={arXiv},
+      primaryClass={cs.CR},
+      url={https://arxiv.org/abs/2507.11324}, 
+}
 ```
