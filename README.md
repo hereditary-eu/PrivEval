@@ -10,7 +10,7 @@ This means that PrivEval is a first step to bridge the gap between privacy exper
 
 ## How to run the demo on your own machine
 
-1. Make sure that .devcontainer/devcontainer.json contains the correct python engine
+1. Make sure that .devcontainer/devcontainer.json contains the correct python engine (Python 3.8 - Python 3.12)
 
 2. Install the requirements
 
