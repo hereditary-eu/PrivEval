@@ -35,7 +35,7 @@ def get_metric_results(real_data, syn_data, real_labels, syn_labels, sensitive_a
         print(f"Error in CRP calculation: {e}")
         crp = 0.0
     try:
-        nsnd = 1 - NSND.calculate_metric(args=None, _real_data=real_data, _synthetic=syn_data)
+        nsnd = NSND.calculate_metric(args=None, _real_data=real_data, _synthetic=syn_data)
         print(f"NSND calculated: {nsnd}")
     except Exception as e:
         print(f"Error in NSND calculation: {e}")
@@ -47,7 +47,7 @@ def get_metric_results(real_data, syn_data, real_labels, syn_labels, sensitive_a
         print(f"Error in CVP calculation: {e}")
         cvp = 0.0
     try:
-        dvp = 1 - DVP.calculate_metric(args=None, _real_data=real_data, _synthetic=syn_data)
+        dvp = DVP.calculate_metric(args=None, _real_data=real_data, _synthetic=syn_data)
         print(f"DVP calculated: {dvp}")
     except Exception as e:
         print(f"Error in DVP calculation: {e}")

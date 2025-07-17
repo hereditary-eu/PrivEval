@@ -433,33 +433,81 @@ def gower_knn(a, b, num):
     return np.array(d).T, np.array(idxs).T
 
 def has_problematic_synthetic_neighbors():
-        threshold = 0.5  # Define the threshold for "about the same distance"
-        nn_real = NearestNeighbors(n_neighbors=len(st.session_state.tsne_df_syn))  
-        nn_real.fit(st.session_state.tsne_df_real)
-
-        # Step 1: Fit NearestNeighbors to find real nearest neighbors
-        nn_real_point = NearestNeighbors(n_neighbors=2)  # 2 to include itself and its nearest neighbor
-        nn_real_point.fit(st.session_state.tsne_df_real)
-
-        # Step 2: Iterate over all real data points
-        for i in range(len(st.session_state.tsne_df_real)):
-            real_point = st.session_state.tsne_df_real.iloc[[i]]  # Keep as DataFrame
-            dists_real, _ = nn_real.kneighbors(real_point)
-
-            # Find the distance to the nearest real neighbor
-            dist_real_nn, _ = nn_real_point.kneighbors(real_point)
-            max_distance = dist_real_nn[0, 1]  # The nearest neighbor distance (skip the first which is itself)
-
-            # Find synthetic neighbors that meet both conditions
-            dists = dists_real[0]  # Get distances to synthetic points
-            valid_synthetic_points = np.where((np.abs(dists - dists[1]) < threshold) & (dists <= max_distance))[0]
-
-            # If any real point fails the condition, return False
-            if len(valid_synthetic_points) < 3:
-                return False
-
-        return True  # All real points have sufficient synthetic neighbors
+    """
+    Check if any real data point has multiple synthetic neighbors that are too close (indicating a clustering).
+    Returns True if any real point has synthetic neighbors that are too close, False otherwise.
+    """
+    # Fit nearest neighbors for synthetic data
+    nn_syn = NearestNeighbors(n_neighbors=len(st.session_state.tsne_df_syn))  
+    nn_syn.fit(st.session_state.tsne_df_syn)
     
+    # Fit nearest neighbors for real data (to find real neighbors)
+    nn_real = NearestNeighbors(n_neighbors=2)  # 2 to include itself and nearest neighbor
+    nn_real.fit(st.session_state.tsne_df_real)
+    
+    # Collect all distances to calculate adaptive threshold
+    real_distances = []
+    syn_distances = []
+    
+    for i in range(len(st.session_state.tsne_df_real)):
+        real_point = st.session_state.tsne_df_real.iloc[[i]]
+        
+        # Get distances from real point to ALL synthetic points
+        dists_to_syn, _ = nn_syn.kneighbors(real_point)
+        
+        # Get distance to nearest real neighbor (excluding self)
+        dists_to_real, _ = nn_real.kneighbors(real_point)
+        nearest_real_distance = dists_to_real[0, 1]  # Distance to nearest real (excluding self)
+        nearest_syn_distance = dists_to_syn[0, 0]  # Distance to nearest synthetic
+        
+        real_distances.append(nearest_real_distance)
+        syn_distances.append(nearest_syn_distance)
+    
+    # Calculate adaptive threshold based on distance statistics
+    all_distances = real_distances + syn_distances
+    
+    # Percentage of typical distance
+    #mean_distance = np.mean(all_distances)
+    #adaptive_threshold = 0.1 * mean_distance  # 10% of mean distance
+    
+    # Standard deviation based
+    # std_distance = np.std(all_distances)
+    # adaptive_threshold = 0.5 * std_distance  # Half standard deviation
+    
+    # Percentile based
+    # adaptive_threshold = np.percentile(all_distances, 10)  # 10th percentile
+    
+    # Minimum distance based
+    min_distance = np.min(all_distances)
+    adaptive_threshold = max(0.05, min_distance * 0.2)  # 20% of min, with floor
+    
+    # Check each real data point
+    for i in range(len(st.session_state.tsne_df_real)):
+        real_point = st.session_state.tsne_df_real.iloc[[i]]
+        
+        # Get distances from real point to ALL synthetic points
+        dists_to_syn, _ = nn_syn.kneighbors(real_point)
+        
+        # Get distance to nearest real neighbor (excluding self)
+        dists_to_real, _ = nn_real.kneighbors(real_point)
+        nearest_real_distance = dists_to_real[0, 1]  # Distance to nearest real (excluding self)
+        
+        # Find synthetic neighbors that are:
+        # 1. About the same distance as the nearest synthetic neighbor
+        # 2. Closer than the nearest real neighbor
+        nearest_syn_distance = dists_to_syn[0, 0]  # Distance to nearest synthetic
+        
+        valid_synthetic_points = np.where(
+            (np.abs(dists_to_syn[0] - nearest_syn_distance) < adaptive_threshold) & 
+            (dists_to_syn[0] <= nearest_real_distance)
+        )[0]
+
+        # If any real point fails the condition, return True
+        if len(valid_synthetic_points) > 3: # More than 3 valid points indicating cluster
+            return True  # Found a problematic synthetic neighbor
+
+    return False
+
 def air_no_prot():
     if not st.session_state.uploaded:
         key_fields = ['First Name', 'Last Name', 'Height', 'Nationality', 'Favorite Icecream', 'Times Been to Italy', 'First Time London', 'Steps per Day']
@@ -543,11 +591,22 @@ def crp_no_prot():
         return True
     return False
 def nsnd_no_prot():
-    return ((st.session_state.dists_syn[st.session_state.indiv_index, 0] - min(st.session_state.dists_syn[:, 0]))) / (max(st.session_state.dists_syn[:, 0]) - min(st.session_state.dists_syn[:, 0]) + 1e-8) > 0.5
+    min_dist = np.min(st.session_state.dists_syn[:, 0])
+    max_dist = np.max(st.session_state.dists_syn[:, 0])
+    normalized_distance = (st.session_state.dists_syn[st.session_state.indiv_index, 0] - min_dist) / (max_dist - min_dist + 1e-8)
+    all_normalized_distances = (st.session_state.dists_syn[:, 0] - min_dist) / (max_dist - min_dist + 1e-8)
+
+    return normalized_distance < np.percentile(all_normalized_distances, 10)  # Check if the normalized distance is in the bottom 10% of distances
 def cvp_no_prot():
-    return st.session_state.dists_syn[st.session_state.indiv_index, 0] < 0.2
+    min_dist = np.min(st.session_state.dists_syn[:, 0])
+    max_dist = np.max(st.session_state.dists_syn[:, 0])
+    normalized_distance = (st.session_state.dists_syn[st.session_state.indiv_index, 0] - min_dist) / (max_dist - min_dist + 1e-8)
+    return normalized_distance < 0.2
 def dvp_no_prot():
-    return st.session_state.dists_syn[st.session_state.indiv_index, 0] < 0.8
+    min_dist = np.min(st.session_state.dists_syn[:, 0])
+    max_dist = np.max(st.session_state.dists_syn[:, 0])
+    normalized_distance = (st.session_state.dists_syn[st.session_state.indiv_index, 0] - min_dist) / (max_dist - min_dist + 1e-8)
+    return normalized_distance < 0.8
 def auth_no_prot():
     return (st.session_state.dists_syn[st.session_state.indiv_index, 0] - st.session_state.dists_real[st.session_state.indiv_index, 1]) < 0
 def idS_no_prot():
@@ -590,7 +649,7 @@ def dcr_no_prot():
     return st.session_state.dists_real_syn_gower[st.session_state.indiv_index, 0] < (np.mean(st.session_state.dists_real_syn_gower[:, 0])/2)
 def nndr_no_prot():
     ratio = 1 if st.session_state.dists_real_syn_gower[st.session_state.indiv_index, 0] == 0 else (st.session_state.dists_real_syn_gower[st.session_state.indiv_index, 0] / st.session_state.dists_real_syn_gower[st.session_state.indiv_index, 1])
-    return ratio > 0.9
+    return ratio > 0.5
 def hidr_no_prot():
     return st.session_state.indiv_index == st.session_state.idx_real_syn_gower[st.session_state.indiv_index, 0]
     
@@ -664,10 +723,10 @@ def metric_applicability(metric_results):
     if metric_results.loc[metric_results['Metric']=='Hitting Rate', 'Result'].iloc[0] >= 0.00001:
         shareable_column.loc[shareable_column['Metric']=='Hitting Rate', 'Shareable?'] = '⛔️'
         st.session_state.hitr_share = '⛔️'
-    # Membership Inference Risk metric has been commented out
-    # if metric_results.loc[metric_results['Metric']=='Membership Inference Risk', 'Result'].iloc[0] > 0.5:
-    #     shareable_column.loc[shareable_column['Metric']=='Membership Inference Risk', 'Shareable?'] = '⛔️'
-    #     st.session_state.mir_share = '⛔️'
+    
+    if metric_results.loc[metric_results['Metric']=='Membership Inference Risk', 'Result'].iloc[0] > 0.5:
+        shareable_column.loc[shareable_column['Metric']=='Membership Inference Risk', 'Shareable?'] = '⛔️'
+        st.session_state.mir_share = '⛔️'
     if metric_results.loc[metric_results['Metric']=='Nearest Neighbour Adversarial Accuracy', 'Result'].iloc[0] > 0.1:
         shareable_column.loc[shareable_column['Metric']=='Nearest Neighbour Adversarial Accuracy', 'Shareable?'] = '⚠️'
         st.session_state.nnaa_share = '⚠️'
@@ -677,6 +736,9 @@ def metric_applicability(metric_results):
     if metric_results.loc[metric_results['Metric']=='Nearest Synthetic Neighbour Distance', 'Result'].iloc[0] > 0.5:
         shareable_column.loc[shareable_column['Metric']=='Nearest Synthetic Neighbour Distance', 'Shareable?'] = '⚠️'
         st.session_state.nsnd_share = '⚠️'
+    if metric_results.loc[metric_results['Metric']=='Nearest Synthetic Neighbour Distance', 'Result'].iloc[0] > 0.75:
+        shareable_column.loc[shareable_column['Metric']=='Nearest Synthetic Neighbour Distance', 'Shareable?'] = '⛔️'
+        st.session_state.nsnd_share = '⛔️'
     if metric_results.loc[metric_results['Metric']=='Close Value Probability', 'Result'].iloc[0] >= 0.00001:
         shareable_column.loc[shareable_column['Metric']=='Close Value Probability', 'Shareable?'] = '⛔️'
         st.session_state.cvp_share = '⛔️'
@@ -695,7 +757,7 @@ def metric_applicability(metric_results):
     if metric_results.loc[metric_results['Metric']=='Distance to Closest Record', 'Result'].iloc[0] > 0.5:
         shareable_column.loc[shareable_column['Metric']=='Distance to Closest Record', 'Shareable?'] = '⚠️'
         st.session_state.dcr_share = '⚠️'
-    if metric_results.loc[metric_results['Metric']=='Nearest Neighbour Distance Ratio', 'Result'].iloc[0] > 0.3:
+    if metric_results.loc[metric_results['Metric']=='Nearest Neighbour Distance Ratio', 'Result'].iloc[0] > 0.5:
         shareable_column.loc[shareable_column['Metric']=='Nearest Neighbour Distance Ratio', 'Shareable?'] = '⚠️'
         st.session_state.nndr_share = '⚠️'
     if metric_results.loc[metric_results['Metric']=='Hidden Rate', 'Result'].iloc[0] >= 0.00001:
@@ -736,10 +798,9 @@ def metric_applicability(metric_results):
     if hitr_no_prot():
         user_protected_column.loc[user_protected_column['Metric']=='Hitting Rate', 'User Protected?'] = '⛔️'
         st.session_state.hitr_prot = '⛔️'
-    # Membership Inference Risk metric has been commented out
-    # if metric_results.loc[metric_results['Metric']=='Membership Inference Risk', 'Result'].iloc[0] <= 1:
-    #     user_protected_column.loc[user_protected_column['Metric']=='Membership Inference Risk', 'User Protected?'] = '⚠️'
-    #     st.session_state.mir_prot = '⚠️'
+    if metric_results.loc[metric_results['Metric']=='Membership Inference Risk', 'Result'].iloc[0] <= 1:
+        user_protected_column.loc[user_protected_column['Metric']=='Membership Inference Risk', 'User Protected?'] = '⚠️'
+        st.session_state.mir_prot = '⚠️'
     if nnaa_no_prot():
         user_protected_column.loc[user_protected_column['Metric']=='Nearest Neighbour Adversarial Accuracy', 'User Protected?'] = '️️⛔️'
         st.session_state.nnaa_prot = '⛔️'
@@ -2143,14 +2204,18 @@ if st.session_state.stage == 18: #NSND
         st.subheader("How is your score calculated?")
         st.write("Your nearest synthetic neighbour:")
         st.dataframe(st.session_state.syn_data_bin.iloc[[st.session_state.idxs_syn[st.session_state.indiv_index, 0]]], use_container_width=True, hide_index=True)
-        st.write(f"With distance: {round(st.session_state.dists_syn[st.session_state.indiv_index, 0], 2)}")
+        min_dist = np.min(st.session_state.dists_syn[:, 0])
+        max_dist = np.max(st.session_state.dists_syn[:, 0])
+        normalized_distance = (st.session_state.dists_syn[st.session_state.indiv_index, 0] - min_dist) / (max_dist - min_dist + 1e-8)
+        all_normalized_distances = (st.session_state.dists_syn[:, 0] - min_dist) / (max_dist - min_dist + 1e-8)
+        st.write(f"With distance: {round(normalized_distance, 2)}")
         st.write("For your record, the NSND contribution would therefore be:")
-        st.latex(r'\frac{'f'{round(st.session_state.dists_syn[st.session_state.indiv_index, 0], 2)} - {round(min(st.session_state.dists_syn[:, 0]), 2)}(min(dist))'r'}{'f'{round(max(st.session_state.dists_syn[:, 0]), 2)}(max(dist)) - {round(min(st.session_state.dists_syn[:, 0]), 2)}(min(dist)) + 1e-8'r'} = 'f'{round(((st.session_state.dists_syn[st.session_state.indiv_index, 0] - min(st.session_state.dists_syn[:, 0]))) / (max(st.session_state.dists_syn[:, 0]) - min(st.session_state.dists_syn[:, 0]) + 1e-8), 2)}')
+        st.latex(r'\frac{'f'{round(normalized_distance, 2)} - {round(min(all_normalized_distances), 2)}(min(dist))'r'}{'f'{round(max(all_normalized_distances), 2)}(max(dist)) - {round(min(all_normalized_distances), 2)}(min(dist)) + 1e-8'r'} = 'f'{round(((normalized_distance - min(all_normalized_distances)) / (max(all_normalized_distances) - min(all_normalized_distances) + 1e-8)), 2)}')
         if nsnd_no_prot():
             st.write("⛔️Your synthetic neighbour is relatively close. Therefore, you are at high risk!⛔️")
         else:
-            st.write("✅Your synthetic neighbour is relatively far away. Therefore, you are not at risk.✅")
-        
+            st.write("✅Your distance is not in the bottom 10%. Therefore, you are not at risk.✅")
+
         st.subheader("Risk estimation of the dataset")
         st.write("The score is calculated as the mean min-max reduced distance to the nearest synthetic neighbour.")
         st.write("*To make the score fit the risk measure, the score is subtracted from 1.*")
@@ -2217,12 +2282,15 @@ if st.session_state.stage == 19: #CVP
         
         st.write("Your nearest synthetic neighbour:")
         st.dataframe(st.session_state.syn_data_bin.iloc[[st.session_state.idxs_syn[st.session_state.indiv_index, 0]]], use_container_width=True, hide_index=True)
-        st.write(f"With distance: {round(st.session_state.dists_syn[st.session_state.indiv_index, 0], 2)}")
-        if round(st.session_state.dists_syn[st.session_state.indiv_index, 0], 2) < 0.2:
+        min_dist = np.min(st.session_state.dists_syn[:, 0])
+        max_dist = np.max(st.session_state.dists_syn[:, 0])
+        normalized_distance = (st.session_state.dists_syn[st.session_state.indiv_index, 0] - min_dist) / (max_dist - min_dist + 1e-8)
+        st.write(f"With distance: {round(normalized_distance, 2)}")
+        if round(normalized_distance, 2) < 0.2:
             contribution = 1
         else: contribution = 0
         st.write("For your record, the CVP contribution would therefore be:")
-        st.latex(r'\frac{'f'{contribution}'r'}{'f'{len(st.session_state.dists_real)}'r'} = 'f'{round(contribution / len(st.session_state.dists_real))}')
+        st.latex(r'\frac{'f'{contribution}'r'}{'f'{len(st.session_state.dists_real)}'r'} = 'f'{round(contribution / len(st.session_state.dists_real), 4)}')
         if cvp_no_prot():
             st.write("⛔️You have a close synthetic individual(s). Therefore, you are at high risk!⛔️")
         else:
@@ -2247,8 +2315,9 @@ if st.session_state.stage == 19: #CVP
         st.write(" - Thresholds are easy to cheat by the synthesizer. Just make sure that sensitive data is at least the threshold away from the original sensitive field.")
         st.write(' - Finding a "correct" threshold is a very difficult task.')
         st.write("This may be visible from looking at the minimum distance between real and synthetic nearest neighbour data points, which is:")
-        st.write("Real to synthetic:", round(np.min(st.session_state.dists_syn[:, 0]), 2))
-        
+        all_normalized_distances = (st.session_state.dists_syn[:, 0] - min_dist) / (max_dist - min_dist + 1e-8)
+        st.write("Minimum normalised distance from real to synthetic:", round(np.min(all_normalized_distances), 4))
+
     with col2:
         st.write("Scatter plot of real and synthetic data:")
         st.pyplot(scatter_plot_tsne(st.session_state.real_coords_tsne, st.session_state.syn_coords_tsne))
@@ -2295,11 +2364,15 @@ if st.session_state.stage == 20: #DVP
         st.subheader("How is your score calculated?")
         st.write("Your nearest synthetic neighbour:")
         st.dataframe(st.session_state.syn_data_bin.iloc[[st.session_state.idxs_syn[st.session_state.indiv_index, 0]]], use_container_width=True, hide_index=True)
-        st.write(f"With distance: {round(st.session_state.dists_syn[st.session_state.indiv_index, 0], 2)}")
-        if round(st.session_state.dists_syn[st.session_state.indiv_index, 0], 2) > 0.8:
+        min_dist = np.min(st.session_state.dists_syn[:, 0])
+        max_dist = np.max(st.session_state.dists_syn[:, 0])
+        normalized_distance = (st.session_state.dists_syn[st.session_state.indiv_index, 0] - min_dist) / (max_dist - min_dist + 1e-8)
+        all_normalized_distances = (st.session_state.dists_syn[:, 0] - min_dist) / (max_dist - min_dist + 1e-8)
+        st.write(f"With distance: {round(normalized_distance, 2)}")
+        if round(normalized_distance, 2) < 0.8:
             contribution = 1
         else: contribution = 0
-        st.write("For your record, the DVP contribution would therefore be:")
+        st.write("For your record, the DVP contribution (that will be subtracted from 1) would therefore be:")
         st.latex(r'\frac{'f'{-contribution}'r'}{'f'{len(st.session_state.dists_real)}'r'} = 'f'{round(-contribution / len(st.session_state.dists_real), 4)}')
         if dvp_no_prot():
             st.write("⛔️You have a close synthetic individual(s). Therefore, you are at high risk!⛔️")
@@ -2325,7 +2398,7 @@ if st.session_state.stage == 20: #DVP
         st.write(" - Thresholds are easy to cheat by the synthesizer. Just make sure that sensitive data is at least the threshold away from the original sensitive field.")
         st.write(' - Finding a "correct" threshold is a very difficult task.')
         st.write("This may be visible from looking at the minimum distance between real and synthetic nearest neighbour data points, which is:")
-        st.write("Real to synthetic:", round(np.min(st.session_state.dists_syn[:, 0]), 2))
+        st.write("Real to synthetic:", round(np.min(all_normalized_distances), 2))
     
     with col2:
         st.write("Scatter plot of real and synthetic data:")
@@ -2728,7 +2801,7 @@ if st.session_state.stage == 25: #NNDR
         ratio = 1 if st.session_state.dists_real_syn_gower[st.session_state.indiv_index, 0] == 0 else (st.session_state.dists_real_syn_gower[st.session_state.indiv_index, 0] / st.session_state.dists_real_syn_gower[st.session_state.indiv_index, 1])
         st.latex(r"1 - \frac{"f"{round(st.session_state.dists_real_syn_gower[st.session_state.indiv_index, 0], 4)}"r"}{"f"{round(st.session_state.dists_real_syn_gower[st.session_state.indiv_index, 1], 4)}"r"} = "f"{round(ratio, 4)}")
         if nndr_no_prot():
-            st.write("⚠️You have a synthetic neighbours that have similar distances. Therefore, you are at risk!⚠️")
+            st.write("⚠️Your synthetic neighbours do not have similar distances. Therefore, you are at risk!⚠️")
         else:
             st.write("✅Your synthetic neighbours do not have similar distances. Therefore, you are not at risk!✅")
         
@@ -2741,9 +2814,9 @@ if st.session_state.stage == 25: #NNDR
         
         st.subheader(f"Shareability problems: {st.session_state.nndr_share}")
         if st.session_state.nndr_share == '✅':
-            st.write("In general, real individuals do not have similar distances to the synthetic individuals.")
+            st.write("In general, real individuals have synthetic neighbours with a ratio less than 0.5.")
         if st.session_state.nndr_share == '⚠️':
-            st.write("In general, real individuals have similar distances to the synthetic individuals.")
+            st.write("In general, real individuals have synthetic neighbours with a ratio of more than 0.5.")
         st.subheader(f"Applicability problems: {status_overall}")
         st.markdown(prob_overall, unsafe_allow_html=True)
         st.subheader("Solutions:")

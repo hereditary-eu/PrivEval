@@ -10,9 +10,9 @@ def calculate_metric(args=None, _real_data=None, _synthetic=None, **kwargs):
     CVP measures the probability that an adversary is able to distinguish which real 
     individual a synthetic is generated from, where it is assumed that the adversary 
     only has access to synthetic data.
-    
-    CVP(Y, Z) = (Σ 1[Ṽ_E(y, NN_E(y, Z)) < 0.2]) / n
-    
+
+    CVP(Y, Z) = (Σ 1[^D_E(y, NN_E(y, Z)) < t]) / n
+
     Args:
         _real_data: Real dataset
         _synthetic: Synthetic dataset
@@ -52,9 +52,9 @@ def calculate_metric(args=None, _real_data=None, _synthetic=None, **kwargs):
         # Get distances from real points to their nearest synthetic neighbors
         distances, _ = nn.kneighbors(real_scaled)  # Query with real data
         raw_distances = distances.flatten()
-        
-        # Apply min-max normalization to distances: Ṽ_E(y, z)
-        # Ṽ_E(y, z) = (D_E(y, z) - D_min) / (D_max - D_min)
+
+        # Apply min-max normalization to distances: ^D_E(y, z)
+        # ^D_E(y, z) = (D_E(y, z) - D_min) / (D_max - D_min)
         if len(raw_distances) > 0:
             min_dist = np.min(raw_distances)
             max_dist = np.max(raw_distances)
@@ -68,9 +68,11 @@ def calculate_metric(args=None, _real_data=None, _synthetic=None, **kwargs):
         else:
             return 0.0
         
-        # Count how many real points have normalized distance < 0.2 to nearest synthetic
-        # 1[Ṽ_E(y, NN_E(y, Z)) < 0.2]
-        close_count = np.sum(normalized_distances < 0.2)
+        # Threshold for considering a point "close"
+        t = 0.2  
+        # Count how many real points have normalized distance < t to nearest synthetic
+        # 1[^D_E(y, NN_E(y, Z)) < t]
+        close_count = np.sum(normalized_distances < t)
         
         # Calculate CVP = (Σ 1[condition]) / n
         cvp_score = close_count / len(real_scaled)

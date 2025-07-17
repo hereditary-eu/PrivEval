@@ -108,7 +108,7 @@ def calculate_metric(args, _real_data, _synthetic, sensitive_attributes=None):
     # Calculate total entropy for normalization
     unique_counts = real_data.value_counts()
     total_probs = unique_counts / len(real_data)
-    total_entropy = -np.sum(total_probs * np.log(total_probs + 1e-8))
+    total_entropy = -np.sum(total_probs * np.log(total_probs))
     
     total_air = 0
     

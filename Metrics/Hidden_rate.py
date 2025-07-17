@@ -23,15 +23,11 @@ from copy import deepcopy
 def calculate_metric(args, _real_data, _synthetic):
     real_data = _real_data.fillna(0)
     synthetic = _synthetic.fillna(0)
-    print("Hidden Rate: fit_transform real data")
     coord_real, model = fit_transform(real_data, nf=2)
-    print("Hidden Rate: transform synthetic data")
     coord_synth = transform(synthetic, model)
-    print("Hidden Rate: calculating metric")
     are_first_hit = avatars_are_k_hit(
             coord_real, coord_synth, distance_metric="minkowski", k=1
         )
-    print("Hidden Rate: calculating results")
     results = calc_hidden_rate(are_first_hit)
 
     return results

@@ -23,12 +23,9 @@ def calculate_metric(args, _real_data, _synthetic):
     
     categorical_val_synth, continous_val_synth = get_categorical_continuous(synthetic)
     synthetic[categorical_val_synth] = synthetic[categorical_val_synth].astype("category")
-    print("NNDR: fit_transform real data")
     #fit a model and transfor real and synthetic data into coordinates
     real_coord, model = fit_transform(real_data, nf=2)
-    print("NNDR: transform synthetic data")
     synth_coord = transform(synthetic, model)
-    print("NNDR: calculating metric")
     results = statistics.mean(get_nndr(real_coord, synth_coord))
 
     return (1-results)

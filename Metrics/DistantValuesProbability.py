@@ -11,14 +11,14 @@ def calculate_metric(args=None, _real_data=None, _synthetic=None, **kwargs):
     distance to real individuals. It calculates the proportion of real individuals 
     that have normalized distances >= t to their nearest synthetic neighbor.
 
-    DVP(Y, Z) = 1 - (Σ 1[Ṽ_E(y, NN_E(y, Z)) >= t]) / n
+    DVP(Y, Z) = 1 - (Σ 1[^D_E(y, NN_E(y, Z)) >= t]) / n
 
     Args:
         _real_data: Real dataset
         _synthetic: Synthetic dataset
 
     Returns:
-        float: DVP score (higher = better privacy) 
+        float: DVP score (lower = better privacy) 
     """
     try:
         # Convert to DataFrames if needed
@@ -51,8 +51,8 @@ def calculate_metric(args=None, _real_data=None, _synthetic=None, **kwargs):
         # Get distances from real points to their nearest synthetic neighbors
         distances, _ = nn.kneighbors(real_scaled)
         raw_distances = distances.flatten()
-        
-        # Apply min-max normalization to distances: Ṽ_E(·,·)
+
+        # Apply min-max normalization to distances: ^D_E(·,·)
         # This is the key difference - normalize the distances, not the features
         if len(raw_distances) > 0:
             min_dist = np.min(raw_distances)

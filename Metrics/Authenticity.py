@@ -38,32 +38,26 @@ def calculate_metric(args=None, _real_data=None, _synthetic=None, alpha=0.95, **
         real_scaled = scaler.fit_transform(real_subset)
         syn_scaled = scaler.transform(syn_subset)
         
-        # Calculate k-nearest neighbor distances in real data to establish the support
-        k = min(5, len(real_scaled) - 1)
-        if k < 1:
-            return 0.0
+        # Set up nearest neighbor models
+        # For finding nearest real neighbors (need 2 to exclude self)
+        nbrs_real = NearestNeighbors(n_neighbors=2, metric='euclidean')
+        nbrs_real.fit(real_scaled)
         
-        # Fit KNN on real data
-        real_knn = NearestNeighbors(n_neighbors=k, metric='euclidean')
-        real_knn.fit(real_scaled)
+        # For finding nearest synthetic neighbors
+        nbrs_synth = NearestNeighbors(n_neighbors=1, metric='euclidean')
+        nbrs_synth.fit(syn_scaled)
         
-        # Get distances to k-th nearest neighbor for each real point
-        real_distances, _ = real_knn.kneighbors(real_scaled)
-        real_kth_distances = real_distances[:, -1]  # k-th nearest neighbor distance
+        # Get distances from real points to nearest real neighbors (excluding self)
+        real_to_real_distances, _ = nbrs_real.kneighbors(real_scaled)
+        real_to_real = real_to_real_distances[:, 1]  # Distance to nearest real (excluding self at index 0)
         
-        # Calculate the alpha-th percentile of these distances as the support radius
-        support_radius = np.percentile(real_kth_distances, alpha * 100)
+        # Get distances from real points to nearest synthetic neighbors
+        real_to_synth_distances, real_to_synth_args = nbrs_synth.kneighbors(real_scaled)
+        real_to_synth = real_to_synth_distances.squeeze()  # Distance to nearest synthetic
         
-        # For each synthetic point, check if it's within the support
-        # (i.e., within support_radius of at least one real point)
-        syn_knn_distances, _ = real_knn.kneighbors(syn_scaled)
-        syn_nearest_distances = syn_knn_distances[:, 0]  # Distance to nearest real point
-        
-        # Count synthetic points within the support
-        within_support = np.sum(syn_nearest_distances <= support_radius)
-        
-        # Calculate authenticity as the fraction of synthetic points within support
-        authenticity = within_support / len(syn_scaled) if len(syn_scaled) > 0 else 0.0
+        # Calculate authenticity: count cases where nearest real is closer than nearest synthetic
+        authentic_mask = real_to_real < real_to_synth
+        authenticity = np.mean(authentic_mask)
         
         return 1 - float(authenticity)
         
