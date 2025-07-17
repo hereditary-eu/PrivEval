@@ -10,13 +10,15 @@ This means that PrivEval is a first step to bridge the gap between privacy exper
 
 ## How to run the demo on your own machine
 
-1. Install the requirements
+1. Make sure that .devcontainer/devcontainer.json contains the correct python engine
+
+2. Install the requirements
 
    ```
    $ pip install -r requirements.txt
    ```
 
-2. Run the app
+3. Run the app
 
    ```
    $ streamlit run demo.py
