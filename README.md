@@ -7,7 +7,7 @@
 PrivEval, a tool for assisting users in evaluating the privacy properties of a synthetic dataset.
 Here, the user can explore how privacy is estimated through privacy metrics as well as their applicability for specific scenarios and the implications thereof.
 This means that PrivEval is a first step to bridge the gap between privacy experts and the general public for making privacy estimation more transparent.
-For more information about PrivEval, please read the associated [paper](https://doi.org/10.14778/3750601.3750649)
+For more information about PrivEval, please read the associated [paper](https://doi.org/10.14778/3750601.3750649).
 
 ## How to run the demo on your own machine
 
@@ -70,7 +70,8 @@ For some metrics, we refer to their individual implementations in the Metrics fo
 
 
 ## Citing
-If you use this code, please cite the associated paper:
+If you use this code, please cite the associated paper.
+
 PrivEval:
 ```
 @article{trudslev2025priveval,
