@@ -4,9 +4,10 @@
 <img center=True width="904" height="246" alt="PrivEval_model" src="https://github.com/user-attachments/assets/dabde83a-634a-4e70-8d16-fede51e268c6" />
 </p>
 
-[PrivEval](https://doi.org/10.14778/3750601.3750649): a tool for assisting users in evaluating the privacy properties of a synthetic dataset.
+PrivEval, a tool for assisting users in evaluating the privacy properties of a synthetic dataset.
 Here, the user can explore how privacy is estimated through privacy metrics as well as their applicability for specific scenarios and the implications thereof.
 This means that PrivEval is a first step to bridge the gap between privacy experts and the general public for making privacy estimation more transparent.
+For more information about PrivEval, please read the associated [paper](https://doi.org/10.14778/3750601.3750649)
 
 ## How to run the demo on your own machine
 
