@@ -21,7 +21,7 @@ def set_state(i):
 def get_data(epsilon):
     st.session_state.real_data = pd.read_csv(f'sample_data_1.csv', index_col=False)
     st.session_state.syn_data_bin = pd.read_csv(f'demo_syn/syn_no_1_{epsilon}.csv', index_col=False).drop(columns=['Unnamed: 0']) #They got switched around during synthesis
-    st.session_state.metric_results_bin = pd.read_csv(f'metric_results/syn_no_1_{epsilon}.csv', index_col=False).drop(columns=['Unnamed: 0', 'Unnamed: 0.1', 'Unnamed: 0.2'])#They got switched around during synthesis
+    st.session_state.metric_results_bin = pd.read_csv(f'metric_results/syn_no_1_{epsilon}.csv', index_col=False)
     st.session_state.epsilon = epsilon
     #recalculate CRP
     intersection = (st.session_state.real_data.merge(st.session_state.syn_data_bin, how="inner", indicator=False).drop_duplicates())
