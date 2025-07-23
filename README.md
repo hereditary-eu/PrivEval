@@ -4,7 +4,7 @@
 <img center=True width="904" height="246" alt="PrivEval_model" src="https://github.com/user-attachments/assets/dabde83a-634a-4e70-8d16-fede51e268c6" />
 </p>
 
-PrivEval, a tool for assisting users in evaluating the privacy properties of a synthetic dataset.
+[PrivEval](https://doi.org/10.14778/3750601.3750649): a tool for assisting users in evaluating the privacy properties of a synthetic dataset.
 Here, the user can explore how privacy is estimated through privacy metrics as well as their applicability for specific scenarios and the implications thereof.
 This means that PrivEval is a first step to bridge the gap between privacy experts and the general public for making privacy estimation more transparent.
 
@@ -72,7 +72,17 @@ For some metrics, we refer to their individual implementations in the Metrics fo
 If you use this code, please cite the associated paper:
 PrivEval:
 ```
-
+@article{trudslev2025priveval,
+	year = 2025,
+	volume = {18},
+	number = {12},
+	pages = {5271 - 5274},
+        doi = {10.14778/3750601.3750649},
+	author = {Frederik Marinus Trudslev and Matteo Lissandrini and Juan Manuel Rodriguez and Martin Bøgsted and Daniele Dell'Aglio},
+	title = {PrivEval: a tool for interactive evaluation of privacy metrics in
+synthetic data generation},
+	journal = {Proceedings of the {VLDB} Endowment}
+}
 ```
 Technical Report:
 ```
