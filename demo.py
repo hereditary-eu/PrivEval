@@ -479,8 +479,8 @@ def has_problematic_synthetic_neighbors():
     
     # Minimum distance based
     min_distance = np.min(all_distances)
-    adaptive_threshold = max(0.05, min_distance * 0.2)  # 20% of min, with floor
-    
+    adaptive_threshold = 0.05 * min_distance  # 5% of min, with floor
+
     # Check each real data point
     for i in range(len(st.session_state.tsne_df_real)):
         real_point = st.session_state.tsne_df_real.iloc[[i]]
@@ -677,9 +677,6 @@ def metric_applicability(metric_results):
     solution_column = pd.DataFrame(metric_results['Metric'])
     solution_column['Possible Solution'] = '✅'
     
-    applicability_u_column = pd.DataFrame(metric_results['Metric'])
-    applicability_u_column['User App.'] = '✅'
-    
     user_protected_column = pd.DataFrame(metric_results['Metric'])
     user_protected_column['User Protected?'] = '✅'
     
@@ -842,41 +839,28 @@ def metric_applicability(metric_results):
         zcap_prob += f'<br>- Continuous attributes can not be used ({st.session_state.cont_cols}).'
         zcap_sol += '<br>- Remove all continuous attributes.'
         applicability_column.loc[applicability_column['Metric']=='ZeroCAP', 'App.'] = '⛔️'
-        applicability_u_column.loc[applicability_u_column['Metric']=='ZeroCAP', 'User App.'] = '⛔️'
         gcap_prob += f'<br>- Key fields contain continuous attributes ({st.session_state.cont_cols}), in the nearest neighbour algorithm, continuous attributes influence the distance measure differently than other attributes.'
         gcap_sol += '<br>- Remove all continuous attributes.'
-        applicability_column.loc[applicability_column['Metric']=='GeneralizedCAP', 'App.'] = '⚠️'
         mdcr_prob += '<br>- Distances lose expresivity for continuous attributes.'
         mdcr_sol += f'<br>- Consider removing continuous attributes.'
-        applicability_column.loc[applicability_column['Metric']=='Median Distance to Closest Record', 'App.'] = '⚠️'
         hitr_prob += '<br>- The randomness induced by the synthesizer makes finding a match highly unlikely.'
         hitr_sol += f'<br>-Consider removing continuous attributes ({st.session_state.cont_cols})'
         applicability_column.loc[applicability_column['Metric']=='Hitting Rate', 'App.'] = '⛔️'
-        applicability_u_column.loc[applicability_u_column['Metric']=='Hitting Rate', 'User App.'] = '⛔️'
         crp_prob += f'<br>- Continuous attributes ({st.session_state.cont_cols}) can not be used, as the noise induced by the synthesizer renders this theoretically impossible.'
         crp_sol += '<br>- Remove all continuous attributes.'
         applicability_column.loc[applicability_column['Metric']=='Common Row Proportion', 'App.'] = '⛔️'
-        applicability_u_column.loc[applicability_u_column['Metric']=='Common Row Proportion', 'User App.'] = '⛔️'
         nsnd_prob += f'<br>- Distances lose expresivity and vary much for continuous attributes ({st.session_state.cont_cols}).'
         nsnd_sol += f'<br>- Consider removing continuous attributes ({st.session_state.cont_cols})'
-        applicability_column.loc[applicability_column['Metric']=='Nearest Synthetic Neighbour Distance', 'App.'] = '⚠️'
         cvp_prob += f'<br>- Distances lose expresivity and vary much for continuous attributes ({st.session_state.cont_cols}).'
         cvp_sol += '<br>- Remove all continuous attributes.'
-        applicability_column.loc[applicability_column['Metric']=='Close Value Probability', 'App.'] = '⚠️'
-        applicability_u_column.loc[applicability_u_column['Metric']=='Close Value Probability', 'User App.'] = '⚠️'
         dvp_prob += f'<br>- Distances lose expresivity and vary much for continuous attributes ({st.session_state.cont_cols}).'
         dvp_sol += '<br>- Remove all continuous attributes.'
-        applicability_column.loc[applicability_column['Metric']=='Distant Value Probability', 'App.'] = '⚠️'
-        applicability_u_column.loc[applicability_u_column['Metric']=='Distant Value Probability', 'User App.'] = '⚠️'
         dcr_prob += f'<br>- Distances lose expresivity and vary much for continuous attributes ({st.session_state.cont_cols}).'
         dcr_sol += '<br>- Consider removing continuous attributes.'
-        applicability_column.loc[applicability_column['Metric']=='Distance to Closest Record', 'App.'] = '⚠️'
         air_prob += f'<br>- Key fields contain continuous attributes ({st.session_state.cont_cols}), in the nearest neighbour algorithm, continuous attributes influence the distance measure differently than other attributes.'
         air_sol += '<br>- Remove all continuous attributes.'
-        applicability_column.loc[applicability_column['Metric']=='Attribute Inference Risk', 'App.'] = '⚠️'
         nndr_prob += f'<br>- Distances lose expresivity and vary much for continuous attributes ({st.session_state.cont_cols}).'
         nndr_sol += '<br>- Consider removing continuous attributes.'
-        applicability_column.loc[applicability_column['Metric']=='Nearest Neighbour Distance Ratio', 'App.'] = '⚠️'
     
     if st.session_state.is_large:
         mdcr_prob += '<br>- Distance can be misleading in high-dimensional spaces.'
@@ -904,70 +888,55 @@ def metric_applicability(metric_results):
         gcap_prob += '<br>- Your sensitive attributes contain continuous variables, the metric will not work.'
         gcap_sol += '<br>- Remove continuous attributes as sensitive values'
         applicability_column.loc[applicability_column['Metric']=='GeneralizedCAP', 'App.'] = '⛔️'
-        applicability_u_column.loc[applicability_u_column['Metric']=='GeneralizedCAP', 'User App.'] = '⛔️'
         air_prob += '<br>- Thresholds are easy to cheat by the synthesizer. Just make sure that sensitive data is at least the threshold away from the original sensitive field.'
         applicability_column.loc[applicability_column['Metric']=='Attribute Inference Risk', 'App.'] = '⚠️'
-        applicability_u_column.loc[applicability_u_column['Metric']=='Attribute Inference Risk', 'User App.'] = '⚠️'
     st.session_state.has_prob_syn_neigh = has_problematic_synthetic_neighbors()
     if st.session_state.has_prob_syn_neigh:
         mdcr_prob += '<br>- Non-private data is still be produced.'
         mdcr_sol += '<br>- Invetigate the distances between individual data points.'
         applicability_column.loc[applicability_column['Metric']=='Median Distance to Closest Record', 'App.'] = '⛔️'
-        applicability_u_column.loc[applicability_u_column['Metric']=='Median Distance to Closest Record', 'User App.'] = '⚠️'
         
         mir_prob += '<br>- Classification model is being cheated, and a risk persists.'
         mir_sol += '<br>- Investigate each real datapoint and its 3 nearest neighbours in real and synthetic.'
         applicability_column.loc[applicability_column['Metric']=='Membership Inference Risk', 'App.'] = '⛔️'
-        applicability_u_column.loc[applicability_u_column['Metric']=='Membership Inference Risk', 'User App.'] = '⚠️'
         nnaa_prob += '<br>- Non-private data is still be produced.'
         nnaa_sol += '<br>- Investigate each real datapoint and its 3 nearest neighbours in real and synthetic.'
         applicability_column.loc[applicability_column['Metric']=='Nearest Neighbour Adversarial Accuracy', 'App.'] = '⛔️'
-        applicability_u_column.loc[applicability_u_column['Metric']=='Nearest Neighbour Adversarial Accuracy', 'User App.'] = '⚠️'
         nsnd_prob += '<br>- Non-private data is still be produced.'
         nsnd_sol += '<br>- Investigate each real datapoint and its 3 nearest neighbours in real and synthetic.'
         applicability_column.loc[applicability_column['Metric']=='Nearest Synthetic Neighbour Distance', 'App.'] = '⛔️'
-        applicability_u_column.loc[applicability_u_column['Metric']=='Nearest Synthetic Neighbour Distance', 'User App.'] = '⚠️'
         auth_prob += '<br>- Non-private data is still be produced.'
         auth_sol += '<br>- Investigate each real datapoint and its 3 nearest neighbours in real and synthetic.'
         applicability_column.loc[applicability_column['Metric']=='Authenticity', 'App.'] = '⛔️'
         dmlp_prob += '<br>- Non-private data is still be produced.'
         dmlp_sol += '<br>- Investigate each real datapoint and its 3 nearest neighbours in real and synthetic.'
         applicability_column.loc[applicability_column['Metric']=='DetectionMLP', 'App.'] = '⛔️'
-        applicability_u_column.loc[applicability_u_column['Metric']=='DetectionMLP', 'User App.'] = '⚠️'
         idS_prob += '<br>- Non-private data is still be produced.'
         idS_sol += '<br>- Investigate each real datapoint and its 3 nearest neighbours in real and synthetic.'
         applicability_column.loc[applicability_column['Metric']=='Identifiability Score', 'App.'] = '⛔️'
-        applicability_u_column.loc[applicability_u_column['Metric']=='Identifiability Score', 'User App.'] = '⚠️'
         dcr_prob += '<br>- Non-private data is still be produced.'
         dcr_sol += '<br>- Investigate each real datapoint and its 3 nearest neighbours in real and synthetic.'
         applicability_column.loc[applicability_column['Metric']=='Distance to Closest Record', 'App.'] = '⛔️'
-        applicability_u_column.loc[applicability_u_column['Metric']=='Distance to Closest Record', 'User App.'] = '⚠️'
         nndr_prob += '<br>- Non-private data is still be produced.'
         nndr_sol += '<br>- Investigate each real datapoint and its 3 nearest neighbours in real and synthetic.'
         applicability_column.loc[applicability_column['Metric']=='Nearest Neighbour Distance Ratio', 'App.'] = '⛔️'
-        applicability_u_column.loc[applicability_u_column['Metric']=='Nearest Neighbour Distance Ratio', 'User App.'] = '⚠️'
     
     
     mir_prob += '<br>- Assumes that the adversary has very much knowledge about the real data.'
     mir_sol += '<br>- Try multiple different subset as a training set to get a better evaluation.'
     applicability_column.loc[applicability_column['Metric']=='Membership Inference Risk', 'App.'] = '⚠️'
-    applicability_u_column.loc[applicability_u_column['Metric']=='Membership Inference Risk', 'User App.'] = '⚠️'
     cvp_prob += '<br>- Finding a "correct" threshold is a very difficult task.'
     cvp_sol += '<br>- Establish a threshold matching distances in datasets.'
     applicability_column.loc[applicability_column['Metric']=='Close Value Probability', 'App.'] = '⛔️'
-    applicability_u_column.loc[applicability_u_column['Metric']=='Close Value Probability', 'User App.'] = '⛔️'
     dvp_prob += '<br>- Finding a "correct" threshold is a very difficult task.'
     dvp_sol += '<br>- Establish a threshold matching distances in datasets.'
     applicability_column.loc[applicability_column['Metric']=='Distant Value Probability', 'App.'] = '⛔️'
-    applicability_u_column.loc[applicability_u_column['Metric']=='Distant Value Probability', 'User App.'] = '⛔️'
     dmlp_prob += '<br>- Assumes that the adversary has very much knowledge about the real data.'
     dmlp_sol += '<br>- Try multiple different subset as a training set to get a better evaluation.'
     applicability_column.loc[applicability_column['Metric']=='DetectionMLP', 'App.'] = '⚠️'
-    applicability_u_column.loc[applicability_u_column['Metric']=='DetectionMLP', 'User App.'] = '⚠️'
     hidd_prob += '<br>- Synthetic individuals need to be generated from the real individual with same index.'
     hidd_sol += '<br>- Use synthesizer that generates individuals that are based on the individual with the same index in the real data.'
     applicability_column.loc[applicability_column['Metric']=='Hidden Rate', 'App.'] = '⛔️'
-    applicability_u_column.loc[applicability_u_column['Metric']=='Hidden Rate', 'User App.'] = '⛔️'
     
     problem_column.loc[problem_column['Metric']=='ZeroCAP', 'Problem'] = zcap_prob
     problem_column.loc[problem_column['Metric']=='GeneralizedCAP', 'Problem'] = gcap_prob
@@ -1492,17 +1461,12 @@ if st.session_state.stage == 10: #AIR
     sol_overall = ''
     status_overall = '✅'
     
-    if st.session_state.is_sens_cont:
-        prob_overall += '<br>- Thresholds are easy to cheat by the synthesizer. Just make sure that sensitive data is at least the threshold away from the original sensitive field.'
-        sol_overall += '<br>- Remove all continuous sensitive attributes.'
-        status_overall = '⚠️'
     if st.session_state.is_large:
         prob_overall += '<br>- Distance can be misleading in high-dimensional spaces.'
         sol_overall += '<br>- Consider decreasing the dataset size.'
     if st.session_state.has_continuous:
         prob_overall += f'<br>- Key fields contain continuous attributes ({st.session_state.cont_cols}), in the nearest neighbour algorithm, continuous attributes influence the distance measure differently than other attributes.'
         sol_overall += '<br>- Remove all continuous attributes.'
-        status_overall = '⚠️'
     
     st.title(tit)
     st.subheader(f"User Protected?: {st.session_state.air_prot}, Shareability: {st.session_state.air_share}, Applicability: {status_overall}")
@@ -1622,7 +1586,6 @@ if st.session_state.stage == 11: #GCAP
     if st.session_state.has_continuous:
         prob_overall += f'<br>- Key fields contain continuous attributes ({st.session_state.cont_cols}), in the nearest neighbour algorithm, continuous attributes influence the distance measure differently than other attributes.'
         sol_overall += '<br>- Remove all continuous attributes.'
-        status_overall = '⚠️'
     
     st.title(tit)
     st.subheader(f"User Protected?: {st.session_state.gcap_prot}, Shareability: {st.session_state.gcap_share}, Applicability: {status_overall}")
@@ -1780,7 +1743,6 @@ if st.session_state.stage == 13: #MDCR
     if st.session_state.has_continuous:
         prob_overall += '<br>- Distances lose expresivity for continuous attributes.'
         sol_overall += f'<br>- Consider removing continuous attributes.'
-        status_overall = '⚠️'
     if st.session_state.has_prob_syn_neigh:
         prob_overall += '<br>- Non-private data is still be produced.'
         sol_overall += '<br>- Invetigate the distances between individual data points.'
@@ -1962,7 +1924,6 @@ if st.session_state.stage == 15: #MIR
         prob_overall += '<br>- Classification model is being cheated, and a risk persists.'
         sol_overall += '<br>- Investigate each real datapoint and its 3 nearest neighbours in real and synthetic.'
         status_overall = '⛔️'
-        status_u = '⛔️'
         
     st.title(tit)
     st.subheader(f"User Protected?: {st.session_state.mir_prot}, Shareability: {st.session_state.mir_share}, Applicability: {status_overall}")
@@ -2180,7 +2141,6 @@ if st.session_state.stage == 18: #NSND
     if st.session_state.has_continuous:
         prob_overall += f'<br>- Distances lose expresivity and vary much for continuous attributes ({st.session_state.cont_cols}).'
         sol_overall += f'<br>- Consider removing continuous attributes ({st.session_state.cont_cols})'
-        status_overall = '⚠️'
     if st.session_state.is_large:
         prob_overall += '<br>- Distance can be misleading in high-dimensional spaces.'
         sol_overall += '<br>- Consider decreasing the dataset size.'
@@ -2261,8 +2221,6 @@ if st.session_state.stage == 19: #CVP
     if st.session_state.has_continuous:
         prob_overall += f'<br>- Distances lose expresivity and vary much for continuous attributes ({st.session_state.cont_cols}).'
         sol_overall += '<br>- Remove all continuous attributes.'
-        status_overall = '⚠️'
-        status_u = '⚠️'
         
     prob_overall += '<br>- Finding a "correct" threshold is a very difficult task.'
     sol_overall += '<br>- Establish a threshold matching distances in datasets.'
@@ -2342,8 +2300,6 @@ if st.session_state.stage == 20: #DVP
     if st.session_state.has_continuous:
         prob_overall += f'<br>- Distances lose expresivity and vary much for continuous attributes ({st.session_state.cont_cols}).'
         sol_overall += '<br>- Remove all continuous attributes.'
-        status_overall = '⚠️'
-        status_u = '⚠️'
     if st.session_state.is_large:
         prob_overall += '<br>- Distance can be misleading in high-dimensional spaces.'
         sol_overall += '<br>- Consider decreasing the dataset size.'
@@ -2511,9 +2467,10 @@ if st.session_state.stage == 22: #DMLP
         prob_overall += '<br>- Non-private data is still be produced.'
         sol_overall += '<br>- Investigate each real datapoint and its 3 nearest neighbours in real and synthetic.'
         status_overall = '⛔️'
-    prob_overall += '<br>- Assumes that the adversary has very much knowledge about the real data.'
-    sol_overall += '<br>- Try multiple different subset as a training set to get a better evaluation.'
-    status_overall = '⚠️'
+    else:
+        prob_overall += '<br>- Assumes that the adversary has very much knowledge about the real data.'
+        sol_overall += '<br>- Try multiple different subset as a training set to get a better evaluation.'
+        status_overall = '⚠️'
     
     st.title(tit)
     st.subheader(f"User Protected?: {st.session_state.dmlp_prot}, Shareability: {st.session_state.dmlp_share}, Applicability: {status_overall}")
@@ -2568,7 +2525,6 @@ if st.session_state.stage == 23: #Identifiability
         prob_overall += '<br>- Non-private data is still be produced.'
         sol_overall += '<br>- Investigate each real datapoint and its 3 nearest neighbours in real and synthetic.'
         status_overall = '⛔️'
-        status_u = '⚠️'
         
     st.title(tit)
     st.subheader(f"User Protected?: {st.session_state.ids_prot}, Shareability: {st.session_state.ids_share}, Applicability: {status_overall}")
@@ -2687,7 +2643,6 @@ if st.session_state.stage == 24: #DCR
     if st.session_state.has_continuous:
         prob_overall += f'<br>- Distances lose expresivity and vary much for continuous attributes ({st.session_state.cont_cols}).'
         sol_overall += '<br>- Consider removing continuous attributes.'
-        status_overall = '⚠️'
     if st.session_state.is_large:
         prob_overall += '<br>- Distance can be misleading in high-dimensional spaces.'
         sol_overall += '<br>- Consider decreasing the dataset size.'
@@ -2767,7 +2722,6 @@ if st.session_state.stage == 25: #NNDR
     if st.session_state.has_continuous:
         prob_overall += f'<br>- Distances lose expresivity and vary much for continuous attributes ({st.session_state.cont_cols}).'
         sol_overall += '<br>- Consider removing continuous attributes.'
-        status_overall = '⚠️'
     if st.session_state.is_large:
         prob_overall += '<br>- Distance can be misleading in high-dimensional spaces.'
         sol_overall += '<br>- Consider decreasing the dataset size.'
@@ -2775,7 +2729,6 @@ if st.session_state.stage == 25: #NNDR
         prob_overall += '<br>- Non-private data is still be produced.'
         sol_overall += '<br>- Investigate each real datapoint and its 3 nearest neighbours in real and synthetic.'
         status_overall = '⛔️'
-        status_u = '⚠️'
         
     st.title(tit)
     st.subheader(f"User Protected?: {st.session_state.nndr_prot}, Shareability: {st.session_state.nndr_share}, Applicability: {status_overall}")

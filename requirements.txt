@@ -1,20 +1,22 @@
 # Core ML and Data Science
 streamlit
-pandas>=2.0.0
-numpy>=1.24.0
-scikit-learn>=1.3.0
-scipy>=1.10.0
+pandas
+numpy==1.24.3  # Specific version for compatibility
+scikit-learn
+scipy==1.10.0  # Specific version
 matplotlib
-lightgbm
 
-# Specialized Libraries (keeping the ones that work)
-faiss-cpu
+# Specialized Libraries
+saiph                    # For projection/dimensionality reduction
+faiss-cpu               # For nearest neighbor search
+sdmetrics               # For privacy metrics (includes copulas)
 
-# Data Generation & Processing
-faker
-tqdm
-saiph
+# Privacy/Synthetic Data Libraries
+synthcity               # Synthetic data generation and evaluation
+syntheval               # Evaluation metrics for synthetic data
+DataSynthesizer         # Synthetic data generation
 
-# Build tools for Python 3.13
-setuptools>=65.0
-wheel
+# Other Required
+tqdm                    # Progress bars
+networkx==2.6.3         # Graph library (specific version)
+mpmath==1.3.0           # Mathematical functions

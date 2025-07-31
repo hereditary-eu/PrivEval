@@ -18,8 +18,8 @@ from copy import deepcopy
 def calculate_metric(args, _real_data, _synthetic):
     real_data = deepcopy(_real_data)
     synthetic = deepcopy(_synthetic)
-    os.environ['OMP_NUM_THREADS'] = '1'
-    faiss.omp_set_num_threads(1)
+    #os.environ['OMP_NUM_THREADS'] = '1'
+    #faiss.omp_set_num_threads(1)
     #Assign categorical values with type "category" for both real and synthetic data
     categorical_val_real, continuous_val_real = get_categorical_continuous(real_data)
     real_data[categorical_val_real] = real_data[categorical_val_real].astype("category")

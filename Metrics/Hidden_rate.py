@@ -16,11 +16,14 @@ from typing import Tuple, Union
 import faiss
 import numpy as np
 from numpy.typing import NDArray
+import os
 
 # docs Python: https://github.com/facebookresearch/faiss/wiki/Getting-started
 
 from copy import deepcopy
 def calculate_metric(args, _real_data, _synthetic):
+    #os.environ['OMP_NUM_THREADS'] = '1'
+    #faiss.omp_set_num_threads(1)
     real_data = _real_data.fillna(0)
     synthetic = _synthetic.fillna(0)
     coord_real, model = fit_transform(real_data, nf=2)
