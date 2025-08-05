@@ -100,32 +100,24 @@ def calculate_metric(args, _real_data, _synthetic, sensitive_attributes=None):
         f1_score = 2 * precision * recall / (precision + recall) if (precision + recall) > 0 else 0
     else:
         f1_score = 0
-    
+
     # Calculate entropy-based weights for each unique record pattern
     row_counts = real_data.value_counts().reset_index(name="Count")
     real_data_with_count = real_data.merge(row_counts, how='left')
-    
+
     # Calculate total entropy for normalization
     unique_counts = real_data.value_counts()
     total_probs = unique_counts / len(real_data)
     total_entropy = -np.sum(total_probs * np.log(total_probs))
-    
-    total_air = 0
-    
-    for i in range(len(real_data)):
-        # Probability of this specific record pattern
-        prob = real_data_with_count['Count'].iloc[i] / len(real_data)
-        
-        # Weight based on rarity (inverse probability normalized by entropy)
+
+    # Aggregate by unique patterns and assign weights
+    air = 0
+    for idx, row in row_counts.iterrows():
+        prob = row['Count'] / len(real_data)
         if total_entropy > 0:
             weight = -prob * np.log(prob + 1e-8) / total_entropy
         else:
-            weight = 1.0 / len(real_data)
-        
-        # Add weighted F1 score
-        total_air += weight * f1_score
-    
-    # Normalize by total number of samples
-    air = total_air
-    
+            weight = 1.0 / len(row_counts)
+        air += weight * f1_score
+
     return float(air)
