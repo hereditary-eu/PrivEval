@@ -69,7 +69,7 @@ def calculate_metric(args=None, _real_data=None, _synthetic=None, **kwargs):
         # Calculate mean of normalized distances
         nsnd_score = np.mean(normalized_distances)
         
-        return float(nsnd_score)
+        return 1 - float(nsnd_score)
         
     except Exception as e:
         print(f"Error in NearestSynNeighborDistance: {e}")
