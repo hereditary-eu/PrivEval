@@ -6,7 +6,7 @@ from sklearn.preprocessing import StandardScaler
 
 def calculate_metric(args=None, _real_data=None, _synthetic=None, **kwargs):
     """
-    Calculate Nearest Synthetic Neighbour Distance (NSND) following SynthCity implementation.
+    Calculate Nearest Synthetic Neighbour Distance (NSND) following a modification of the SynthCity implementation.
     
     NSND measures the re-identification risk as a normalised average of nearest neighbour 
     distances from real individuals to synthetic individuals.
@@ -16,7 +16,7 @@ def calculate_metric(args=None, _real_data=None, _synthetic=None, **kwargs):
         _synthetic: Synthetic dataset
     
     Returns:
-        float: NSND score (higher = lower re-identification risk)
+        float: NSND score (higher = higher re-identification risk)
     """
     try:
         # Convert to DataFrames if needed
