@@ -2,6 +2,7 @@
 
 import pandas as pd
 import numpy as np
+from joblib import Parallel, delayed
 
 def calculate_metric(args=None, _real_data=None, _synthetic=None, **kwargs):
     """
@@ -73,50 +74,46 @@ def calculate_metric(args=None, _real_data=None, _synthetic=None, **kwargs):
             col_max = real_subset[col].max()
             thresholds[col] = (col_max - col_min) / 30 if col_max != col_min else 0.0
         
-        # For each real record, check if there exists a synthetic record that matches
-        # HitR(Y, Z) = (Σ 1[∃j | conditions]) / n
-        hit_count = 0
-        
-        for i, real_row in real_subset.iterrows():
-            # Check each synthetic record for a match
-            found_match = False
-            
-            for j, syn_row in syn_subset.iterrows():
-                # Check categorical exact match: y_i[A_C] = z_j[A_C]
-                categorical_match = True
-                for col in categorical_cols:
-                    if real_row[col] != syn_row[col]:
-                        categorical_match = False
-                        break
-                
-                if not categorical_match:
-                    continue
-                
-                # Check continuous approximate match: 
-                # ∀a ∈ A_R, z_j[a] ∈ [y_i[a] - h(a), y_i[a] + h(a)]
-                continuous_match = True
-                for col in continuous_cols:
-                    real_val = real_row[col]
-                    syn_val = syn_row[col]
-                    threshold = thresholds[col]
-                    
-                    if not (real_val - threshold <= syn_val <= real_val + threshold):
-                        continuous_match = False
-                        break
-                
-                # If both categorical and continuous conditions are met, it's a hit
-                if categorical_match and continuous_match:
-                    found_match = True
-                    break
-            
-            if found_match:
-                hit_count += 1
-        
-        # Calculate hitting rate
+        # Group synthetic data by categorical columns for fast lookup
+        if categorical_cols:
+            syn_groups = syn_subset.groupby(categorical_cols)
+        else:
+            syn_groups = None
+
+        def is_hit(real_row):
+            # Get candidate synthetic rows
+            if categorical_cols:
+                key = tuple(real_row[col] for col in categorical_cols)
+                try:
+                    candidates = syn_groups.get_group(key)
+                except KeyError:
+                    return 0
+            else:
+                candidates = syn_subset
+
+            # If no continuous columns, any candidate is a hit
+            if not continuous_cols:
+                return int(len(candidates) > 0)
+
+            # For continuous columns, check thresholds vectorized
+            mask = np.ones(len(candidates), dtype=bool)
+            for col in continuous_cols:
+                real_val = real_row[col]
+                threshold = thresholds[col]
+                mask &= (candidates[col] >= real_val - threshold) & (candidates[col] <= real_val + threshold)
+            return int(mask.any())
+
+        # Parallelize the hit calculation
+        hit_count = sum(
+            Parallel(n_jobs=-1, backend="loky")(
+                delayed(is_hit)(row)
+                for _, row in real_subset.iterrows()
+            )
+        )
+
         hitting_rate = hit_count / len(real_subset) if len(real_subset) > 0 else 0.0
-        
         return float(hitting_rate)
-        
+
     except Exception as e:
         print(f"Error in Hitting_rate calculation: {e}")
         return 0.0

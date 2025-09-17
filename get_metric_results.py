@@ -1,6 +1,6 @@
 import pandas as pd
 import numpy as np
-from Metrics import AttributeInference1 as AIR
+from Metrics import AttributeInference as AIR
 from Metrics import CGeneralizedCAP as GCAP
 from Metrics import CZeroCAP as CZCAP
 from Metrics import NNAA

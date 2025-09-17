@@ -27,28 +27,41 @@ def calculate_metric(args=None, _real_data=None, _synthetic=None, k_folds=5, **k
         if not isinstance(_synthetic, pd.DataFrame):
             _synthetic = pd.DataFrame(_synthetic)
         
-        # Get common columns and select only numeric columns
+        # Get common columns
         common_cols = list(set(_real_data.columns) & set(_synthetic.columns))
-        real_subset = _real_data[common_cols].select_dtypes(include=[np.number])
-        syn_subset = _synthetic[common_cols].select_dtypes(include=[np.number])
-        
-        if real_subset.empty or syn_subset.empty:
-            return 0.5
-        
+        real_subset = _real_data[common_cols].copy()
+        syn_subset = _synthetic[common_cols].copy()
+
+        # Separate numeric and categorical columns
+        num_cols = real_subset.select_dtypes(include=[np.number]).columns.tolist()
+        cat_cols = [col for col in common_cols if col not in num_cols]
+
         # Handle missing values
-        real_subset = real_subset.fillna(real_subset.mean())
-        syn_subset = syn_subset.fillna(syn_subset.mean())
-        
+        for col in num_cols:
+            real_subset[col] = real_subset[col].fillna(real_subset[col].mean())
+            syn_subset[col] = syn_subset[col].fillna(syn_subset[col].mean())
+        for col in cat_cols:
+            real_subset[col] = real_subset[col].fillna('missing').astype(str)
+            syn_subset[col] = syn_subset[col].fillna('missing').astype(str)
+
+        # One-hot encode categorical columns
+        all_cat = pd.concat([real_subset[cat_cols], syn_subset[cat_cols]], axis=0)
+        all_cat_encoded = pd.get_dummies(all_cat, dtype=int)
+        real_cat_encoded = all_cat_encoded.iloc[:len(real_subset), :]
+        syn_cat_encoded = all_cat_encoded.iloc[len(real_subset):, :]
+
+        # Concatenate numeric and encoded categorical columns
+        real_final = pd.concat([real_subset[num_cols].reset_index(drop=True), real_cat_encoded.reset_index(drop=True)], axis=1)
+        syn_final = pd.concat([syn_subset[num_cols].reset_index(drop=True), syn_cat_encoded.reset_index(drop=True)], axis=1)
+
         # Create labels as specified in the description
-        # L_Y = [1, 1, ..., 1] (real data labeled as 1)
-        # L_Z = [0, 0, ..., 0] (synthetic data labeled as 0)
-        real_labels = np.ones(len(real_subset))
-        syn_labels = np.zeros(len(syn_subset))
-        
+        real_labels = np.ones(len(real_final))
+        syn_labels = np.zeros(len(syn_final))
+
         # Combine data: D = Y ∪ Z, L = L_Y ∪ L_Z
-        X = np.vstack([real_subset.values, syn_subset.values])
+        X = np.vstack([real_final.values, syn_final.values])
         y = np.hstack([real_labels, syn_labels])
-        
+
         # Normalize the data
         scaler = StandardScaler()
         X_scaled = scaler.fit_transform(X)

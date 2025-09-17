@@ -99,8 +99,8 @@ def calculate_metric(args=None, _real_data=None, _synthetic=None, **kwargs):
         
         nn_syn = NearestNeighbors(n_neighbors=1, metric='euclidean')
         nn_syn.fit(syn_weighted)
-        
-        nn_real = NearestNeighbors(n_neighbors=3, metric='euclidean')  # Need 3 to get 2nd nearest (excluding self)
+
+        nn_real = NearestNeighbors(n_neighbors=2, metric='euclidean')  # Need 2 to get 2nd nearest (excluding self)
         nn_real.fit(real_weighted)
         
         identifiable_count = 0
@@ -113,7 +113,7 @@ def calculate_metric(args=None, _real_data=None, _synthetic=None, **kwargs):
             # Distance to second nearest real point (excluding self)
             dist_to_real, _ = nn_real.kneighbors([real_point])
             # dist_to_real[0] contains [self, nearest_real, second_nearest_real]
-            second_nearest_real_dist = dist_to_real[0][2]  # Third element is second nearest (excluding self)
+            second_nearest_real_dist = dist_to_real[0][1]  # Second element is nearest (excluding self)
             
             # Check if synthetic point is closer than second nearest real point
             # I(Y, Z) counts cases where D_E(y_i, NN_E(y_i, Z)) < D_E(y_i, 2NN_E(y_i, Y))
