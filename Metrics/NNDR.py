@@ -28,7 +28,7 @@ def calculate_metric(args, _real_data, _synthetic):
     synth_coord = transform(synthetic, model)
     results = statistics.mean(get_nndr(real_coord, synth_coord))
 
-    return (1-results)
+    return 1 - results
 
 class FaissKNeighbors:
     index: Union[faiss.IndexFlatL2, faiss.IndexIVFFlat]

@@ -97,7 +97,7 @@ def calculate_metric(args=None, _real_data=None, _synthetic=None, k_folds=5, **k
         # DMLP = (1/k) * Σ AUC(L_test_i, f_θ_i(D_test_i))
         avg_auc = np.mean(auc_scores)
         
-        return float(avg_auc)
+        return 1 - float(avg_auc)
         
     except Exception as e:
         print(f"Error in DetectionMLP: {e}")

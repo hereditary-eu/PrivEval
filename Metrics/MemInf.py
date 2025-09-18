@@ -3,7 +3,7 @@
 import numpy as np
 import pandas as pd
 from lightgbm import LGBMClassifier
-from sklearn.metrics import precision_score, recall_score, f1_score
+from sklearn.metrics import recall_score
 from sklearn.model_selection import train_test_split
 from copy import deepcopy
 
@@ -85,36 +85,11 @@ def calculate_metric(args=None, _real_data=None, _synthetic=None, num_eval_iter=
         # Return average recall across iterations
         mir_score = np.mean(recall_scores)
         
-        return float(mir_score)
+        return 1 - float(mir_score)
         
     except Exception as e:
         print(f"Error in MIR calculation: {e}")
         return 0.0
 
 
-# Keep the class for backward compatibility if needed
-class MIAClassifier:
-    """The Metric Class for Membership Inference Attack evaluation."""
 
-    def __init__(self, real_data, synt_data, hout_data=None, cat_cols=None, num_cols=None):
-        self.real_data = real_data
-        self.synt_data = synt_data
-        self.hout_data = hout_data
-        self.cat_cols = cat_cols if cat_cols is not None else []
-        self.num_cols = num_cols if num_cols is not None else []
-        self.results = {}
-
-    def name(self) -> str:
-        return "mia"
-
-    def type(self) -> str:
-        return "privacy"
-
-    def evaluate(self, num_eval_iter=5) -> float:
-        """Evaluate using the corrected MIR calculation"""
-        return calculate_metric(
-            args=None, 
-            _real_data=self.real_data, 
-            _synthetic=self.synt_data, 
-            num_eval_iter=num_eval_iter
-        )

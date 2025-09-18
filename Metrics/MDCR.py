@@ -93,7 +93,7 @@ def calculate_metric(args=None, _real_data=None, _synthetic=None, **kwargs):
         ratio = med_dists_Y_Z / med_dists_Y_Y
 
         # Apply sigmoid function
-        mdcr_score = sigmoid(ratio)
+        mdcr_score = 1 - sigmoid(ratio)
 
         return float(mdcr_score)
         
