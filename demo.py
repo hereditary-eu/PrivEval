@@ -1005,6 +1005,8 @@ if 'stage' not in st.session_state:
 
 if st.session_state.stage == 1:#User input
     st.title("PrivEval")
+    st.write("> **Research use only. Not a medical device.**")
+    st.write("> This software was developed in the HEREDITARY project as a research prototype. It has not been assessed or certified under the EU Medical Device Regulation (EU) 2017/745. It must not be used to diagnose, treat, monitor or make any other decision about individual patients.")
     with st.popover("Show storyline"):
         st.subheader("Hi 👋 This is the story elaborating your goal as a researcher trying to generate private synthetic data.")
         st.write("Imagine that you are a doctor that wants to synthesize a dataset that holds your own sensitive data.")
