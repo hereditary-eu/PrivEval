@@ -16,7 +16,7 @@
 |License|Apache-2.0|
 |Repository and DOI|https://github.com/hereditary-eu/PrivEval|
 |Release date|01 August 2025|
-|Related task or deliverable||
+|Related task or deliverable|T3.5, D3.2|
 |How to cite|Frederik Marinus Trudslev. (2025). PrivEval: A Tool for Interactive Evaluation of Privacy Metrics in Synthetic Data Generation. https://github.com/hereditary-eu/PrivEval|
 
 ## 2\. Intended use
