@@ -1,4 +1,4 @@
-*\*Research prototype of the HEREDITARY project. Not a medical device and not for clinical use. Do not enter personal or patient data.\*\*
+*\*Research use only. Not a medical device.\*\*
 # PrivEval: a tool for interactive evaluation of privacy metrics in synthetic data generation
 
 <p align="center">
