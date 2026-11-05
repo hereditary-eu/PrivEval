@@ -1,3 +1,4 @@
+*\*Research use only. Not a medical device.\*\*
 # PrivEval: a tool for interactive evaluation of privacy metrics in synthetic data generation
 
 <p align="center">
@@ -9,7 +10,7 @@ Here, the user can explore how privacy is estimated through privacy metrics as w
 This means that PrivEval is a first step to bridge the gap between privacy experts and the general public for making privacy estimation more transparent.
 For more information about PrivEval, please read the associated [paper](https://doi.org/10.14778/3750601.3750649).
 
-*\*Research use only. Not a medical device.\*\*
+
 
 ## How to run the demo on your own machine
 
