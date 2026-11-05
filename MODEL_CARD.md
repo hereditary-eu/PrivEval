@@ -10,7 +10,7 @@
 |Field|Value|
 |-|-|
 |Name|Frederik Marinus Trudslev|
-|Version||
+|Version|v1.0|
 |Type|Demo|
 |Owner partner and contact|Aalborg University (AAU), Frederik Marinus Trudslev, fmtr@cs.aau.dk|
 |License|Apache-2.0|
